@@ -2,7 +2,7 @@
 addpath(genpath('src'));
 
 % Add MIC to path
-cMICDir = fullfile('vendor', 'github', 'matlab-instrument-control', 'src');
+cMICDir = fullfile('src','vendor', 'github', 'matlab-instrument-control', 'src');
 addpath(genpath(cMICDir));
 
 

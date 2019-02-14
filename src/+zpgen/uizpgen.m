@@ -15,7 +15,7 @@
 %
 %
 
-classdef uizpgen < HandlePlus
+classdef uizpgen < mic.Base
 
     
     properties (Constant)
@@ -90,6 +90,7 @@ classdef uizpgen < HandlePlus
         
         cExecStr = []
         cLogStr = ''
+        arch = computer('arch')
     end
     
     properties (SetAccess = private)
@@ -287,7 +288,12 @@ classdef uizpgen < HandlePlus
                 case this.uibStageAndGenerate
                     this.stageAndGenerate();
                 case this.uibOpenInFinder
-                    system(sprintf('open %s', fullfile(this.cDirThis, '..', 'ZPFiles')));
+                    if strcmp(this.arch, 'win64')
+                        system(sprintf('explorer %s', fullfile(this.cDirThis, '..', 'ZPFiles')));
+                    else
+                        system(sprintf('open %s', fullfile(this.cDirThis, '..', 'ZPFiles')));
+
+                    end
                 case this.uipFileOutput 
                     if this.uipFileOutput.getSelectedIndex() == uint8(1)
                         this.uipNWAPxSize.setSelectedIndex(uint8(5));
@@ -502,14 +508,20 @@ classdef uizpgen < HandlePlus
             end
             zpgen.writeLog(sFileName, this.cLogStr);
             
-            
+            if strcmp(this.arch, 'win64')
+                cPerlStr = 'C:\Perl64\bin\perl.exe';
+            else
+                cPerlStr = 'perl';
+            end
              % Execute optional PERL scripts for WRV processing
             if this.uipFileOutput.getSelectedIndex() == uint8(4)
                 sFilePath = ['src/ZPFiles/' regexprep(this.uieZPName.get(), '\s', '_')];
                 % Zone randomization:
                 if this.uicbRandomizeWRVZones.get()
                     fprintf('Randomizing zones...\n\n');
-                    cExStr = sprintf('perl %s %s.wrv %s_randomized.wrv', ...
+                    
+                    cExStr = sprintf('%s %s %s.wrv %s_randomized.wrv', ...
+                        cPerlStr, ...
                         fullfile(this.cDirThis, '..', 'bin', 'randomizeWRV.pl'), ... 
                         sFilePath, sFilePath);
                     system(cExStr);
@@ -520,7 +532,8 @@ classdef uizpgen < HandlePlus
                 dVal = round(sqrt(this.uieNumBlocks.get()));
                 if dVal > 1
                     fprintf('Splitting WRV into fields...\n\n');
-                    cExStr = sprintf('perl %s %s.wrv %d %d %s_multifield.wrv', ...
+                    cExStr = sprintf('%s %s %s.wrv %d %d %s_multifield.wrv', ...
+                        cPerlStr, ...
                         fullfile(this.cDirThis, '..', 'bin', 'splitWRVtoFields.pl'), ... 
                         sFilePath, dVal, this.uieBlockSize.get(), sFilePath);
                     system(cExStr);
@@ -533,11 +546,21 @@ classdef uizpgen < HandlePlus
         end
         
         function stageZP(this)
-            sPrefix = './src/bin/ZPGen ';
+            
+            if strcmp(this.arch, 'win64')
+                sPrefix = [cd '\src\bin\ZPGen.exe '];
+                sFilePath = regexprep(this.uieZPName.get(), '\s', '_');
+            else
+                sPrefix = './src/bin/ZPGen ';
+                sFilePath = ['src/ZPFiles/' regexprep(this.uieZPName.get(), '\s', '_')];
+            end
+            
+            
+           
             sParams = '';
             sTimestamp = datestr(now, 30);
             
-            sFilePath = ['src/ZPFiles/' regexprep(this.uieZPName.get(), '\s', '_')];
+           
             
    
             
@@ -612,6 +635,13 @@ classdef uizpgen < HandlePlus
             
             
             this.cExecStr = [sPrefix, sParams, sFilePath];
+            if strcmp(this.arch, 'win64')
+                 this.cExecStr = [sPrefix, sParams, sFilePath, ' & move ' sFilePath '.* src\ZPFiles'];
+            else
+                 this.cExecStr = [sPrefix, sParams, sFilePath];
+            end
+            
+            
             
             this.uieExecStr.set(this.cExecStr);
             
