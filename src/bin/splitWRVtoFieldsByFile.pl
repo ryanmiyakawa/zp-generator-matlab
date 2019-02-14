@@ -22,6 +22,7 @@ for (my $kr = 0; $kr < $nBlockSide; $kr++){
         my $subFileName = $ARGV[3]."_$kr"."_$kc";
         local *FILE;
         open (FILE, '>'.$subFileName);
+        print "Generating temp subfield file $subFileName\n";
         push(@files_ref, *FILE);
     }
 }
@@ -82,7 +83,7 @@ while (<WRVSRC>) {
 
 for (my $kr = 0; $kr < $nBlockSide; $kr++){
     for (my $kc = 0; $kc < $nBlockSide; $kc++){
-        print OUTFILE "\nfield $kc $kr\n";
+        print OUTFILE "\n\nfield $kc $kr\n";
 
 
         my $subFileName = $ARGV[3]."_$kr"."_$kc";
@@ -91,14 +92,13 @@ for (my $kr = 0; $kr < $nBlockSide; $kr++){
 
         while (<FILE>){
             $trapCt++;
-            print OUTFILE "$_\n";
+            print OUTFILE "$_";
             if ($trapCt % 50000 == 0){
                 print "Processed $trapCt lines.\n";
             }
         }
 
         # Delete the sub file:
-
         unlink($subFileName);
 
     }

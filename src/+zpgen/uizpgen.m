@@ -524,6 +524,8 @@ classdef uizpgen < mic.Base
                         cPerlStr, ...
                         fullfile(this.cDirThis, '..', 'bin', 'randomizeWRV.pl'), ... 
                         sFilePath, sFilePath);
+                    
+                    fprintf('Exec perl command: \n\t%s\n\n', cExStr);
                     system(cExStr);
                     fprintf('Zone randomization complete...\n\n');
                 end
@@ -537,6 +539,7 @@ classdef uizpgen < mic.Base
                         fullfile(this.cDirThis, '..', 'bin', 'splitWRVtoFieldsByFile.pl'), ... 
                         sFilePath, dVal, this.uieBlockSize.get(), sFilePath);
                     system(cExStr);
+                    fprintf('Exec perl command: \n\t%s\n\n', cExStr);
                     fprintf('Field splitting complete...\n\n');
                 end
             end
