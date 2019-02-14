@@ -1,6 +1,6 @@
 # This script populates a .WRV file with dose information.
 # #
-# # USE:   perl processWRV.pl [input WRV file] [ZPInfo file] [output filename]
+# # USE:   perl processWRV.pl [input WRV file] [nBlockSide] [blockSize] [output filename]
 
 use POSIX;
 
