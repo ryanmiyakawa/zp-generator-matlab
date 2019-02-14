@@ -1,0 +1,8 @@
+*.asv
+vendor
+*.gds
+*.wrv
+*.zip
+*.nwa
+*.txt
+
