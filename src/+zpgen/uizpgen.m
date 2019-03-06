@@ -509,7 +509,15 @@ classdef uizpgen < mic.Base
             zpgen.writeLog(sFileName, this.cLogStr);
             
             if strcmp(this.arch, 'win64')
-                cPerlStr = 'C:\Perl64\bin\perl.exe';
+                if ~isempty(dir('C:\Perl64\bin\perl.exe'))
+                    
+                    % this is a hard code to perl dir, so use this
+                    cPerlStr = 'C:\Perl64\bin\perl.exe';
+                else
+                    % assume perl is in path:
+                    cPerlStr = 'perl';
+                end
+                
             else
                 cPerlStr = 'perl';
             end
@@ -541,7 +549,22 @@ classdef uizpgen < mic.Base
                     system(cExStr);
                     fprintf('Exec perl command: \n\t%s\n\n', cExStr);
                     fprintf('Field splitting complete...\n\n');
+                    
+                     % Combine files
+                     
+                    fprintf('Combining WRVs...\n\n');
+                    cExStr = sprintf('%s %s %s.wrv %d %d %s_multifield.wrv', ...
+                        cPerlStr, ...
+                        fullfile(this.cDirThis, '..', 'bin', 'combineFiles.pl'), ... 
+                        sFilePath, dVal, this.uieBlockSize.get(), sFilePath);
+                    system(cExStr);
+                    fprintf('Exec perl command: \n\t%s\n\n', cExStr);
+                    fprintf('Field splitting complete...\n\n');
                 end
+                
+               
+                
+                
             end
             
             fprintf('Zone plate is finished\n');

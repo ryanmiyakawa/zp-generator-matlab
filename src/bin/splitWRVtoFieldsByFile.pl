@@ -1,9 +1,9 @@
-# This script populates a .WRV file with dose information.
+# This script splits a wrv file to fields
 # #
-# # USE:   perl processWRV.pl [input WRV file] [nBlockSide] [blockSize] [output filename]
+# # USE:   perl splitWRVtoFieldsByFile.pl [input WRV file] [nBlockSide] [blockSize] [output filename]
 
 use POSIX;
-use Fcntl;
+use List::Util qw[min max];
 
 open (WRVSRC, $ARGV[0]);
 open (OUTFILE, '>'.$ARGV[3]);
@@ -30,6 +30,8 @@ for (my $kr = 0; $kr < $nBlockSide; $kr++){
 my $x1 = 0;
 my $y1 = 0;
 
+my $negCt = 0;
+
 while (<WRVSRC>) {
     
     if ($_ =~ m/patdef/){
@@ -42,6 +44,7 @@ while (<WRVSRC>) {
     } elsif($_ =~ m/vepdef/ ){
         print OUTFILE $_;
     } elsif ($_ =~ m/Trap/){
+        $trapCt++;
         $_ =~ m/^\s*(\w+)(\/\d+)?\s(\d+\.?\d*)\s(\d+)\s(\d+)\s?(\d+\.?\d*)?\s*(\d+\.?\d*)?\s?(\d*)\s?(\d*)\s?(\d*)\s?(\d*)\s?(\d*)\s?(\d*)/;
         $x1 = $3;
         $x2 = $5;
@@ -50,8 +53,10 @@ while (<WRVSRC>) {
         $y1 = $4;
         $y2 = $6;
 
-        $kc = floor($x1 / $blockSize);
-        $kr = floor($y1 / $blockSize);
+        
+
+        $kc = floor(min($x1, $x2, $x3, $x4) / $blockSize);
+        $kr = floor(min($y1, $y2) / $blockSize);
 
         $x1 -= $kc * $blockSize;
         $x2 -= $kc * $blockSize;
@@ -59,6 +64,12 @@ while (<WRVSRC>) {
         $x4 -= $kc * $blockSize;
         $y1 -= $kr * $blockSize;
         $y2 -= $kr * $blockSize;
+
+        if ($x1 < 0 or $x2 < 0 or $x3 < 0 or $x4 < 0 or $y1 < 0 or $y2 < 0){
+            print "WARNING, negative value on line $.:";
+            print " Original line: x1: $3, x2: $5, x3: $7, x4: $8, y1: $4, y2: $6; Blocksize: $blockSize\n";
+            $negCt++;
+        }
 
         # print "Accessing matrix index: [$kr,$kc], blocksize: $blockSize, [x,y] = [$x1, $x2]\n";
 
@@ -71,39 +82,9 @@ while (<WRVSRC>) {
     }
 }
 
-# for (my $kr = 0; $kr < $nBlockSide; $kr++){
-#     for (my $kc = 0; $kc < $nBlockSide; $kc++){
-#         close ($files_ref[$kr * $nBlockSide + $kc]);
-#     }
-# }
-
-
-
-
-
-for (my $kr = 0; $kr < $nBlockSide; $kr++){
-    for (my $kc = 0; $kc < $nBlockSide; $kc++){
-        print OUTFILE "\n\nfield $kc $kr\n";
-
-
-        my $subFileName = $ARGV[3]."_$kr"."_$kc";
-        local *FILE;
-        open (FILE, $subFileName);
-
-        while (<FILE>){
-            $trapCt++;
-            print OUTFILE "$_";
-            if ($trapCt % 50000 == 0){
-                print "Processed $trapCt lines.\n";
-            }
-        }
-
-        # Delete the sub file:
-        unlink($subFileName);
-
-    }
+if ($negCt > 0){
+    print "WARNING, $negCt negative values detected";
 }
-
 
 
 print "\nProcessing of WRV file @ARGV[0] complete.  Processed clock speeds on $trapCt shapes.\n\n";
