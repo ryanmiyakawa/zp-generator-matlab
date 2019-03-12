@@ -2,6 +2,9 @@
 % here: /Users/rhmiyakawa/Documents/Xcode/zpgen/ZPGen/ZPGen/ZPGen
 
 % Changelog:
+%
+% 2.8.0: adding block partitioning for NWA files
+%
 % 2.7: getting on to current MIC framework
 %
 % 2.6: Added NWA pixel size
@@ -19,7 +22,7 @@ classdef uizpgen < mic.Base
 
     
     properties (Constant)
-        cBuildName = 'ZPGen v2.7';
+        cBuildName = 'ZPGen v2.8.0';
         
         dWidth  = 600;
         dHeight =  900;
@@ -115,7 +118,7 @@ classdef uizpgen < mic.Base
             [this.cDirThis, cName, cExt] = fileparts(mfilename('fullpath'));
            
             
-            this.uieZoneTol             = mic.ui.common.Edit('cLabel', 'Zone Tolerance', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            this.uieZoneTol             = mic.ui.common.Edit('cLabel', 'Zone Tol', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieLambda              = mic.ui.common.Edit('cLabel', 'Lambda (nm)', 'cType', 'd', 'fhDirectCallback', @this.cb);
             
             this.uieP                   = mic.ui.common.Edit('cLabel', 'p (um)', 'cType', 'd', 'fhDirectCallback', @this.cb);
@@ -163,8 +166,8 @@ classdef uizpgen < mic.Base
             this.uieButtressT           = mic.ui.common.Edit('cLabel', 'Buttress period param', 'cType', 'd', 'fhDirectCallback', @this.cb);
             
             this.uieDoseBiasScaling     = mic.ui.common.Edit('cLabel', 'Dose Bias Scaling', 'cType', 'd', 'fhDirectCallback', @this.cb);
-            this.uieBlockSize           = mic.ui.common.Edit('cLabel', 'WRV Block Size', 'cType', 'd', 'fhDirectCallback', @this.cb);
-            this.uieNumBlocks           = mic.ui.common.Edit('cLabel', 'WRV N^2 Blocks', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            this.uieBlockSize           = mic.ui.common.Edit('cLabel', 'WRV/NWA Block Size', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            this.uieNumBlocks           = mic.ui.common.Edit('cLabel', 'Block N^2 (odd square)', 'cType', 'd', 'fhDirectCallback', @this.cb);
             
             
             this.uieMultiplePatN        = mic.ui.common.Edit('cLabel', 'Multiple Patterning N', 'cType', 'd', 'fhDirectCallback', @this.cb);
@@ -306,8 +309,8 @@ classdef uizpgen < mic.Base
                     end
                 case this.uieNumBlocks
                     dVal = this.uieNumBlocks.get();
-                    if round(sqrt(dVal))^2 ~= dVal
-                        dVal = round(sqrt(this.uieNumBlocks.get()));
+                    if round(sqrt(dVal))^2 ~= dVal || mod(sqrt(dVal), 2) ~= 1
+                        dVal = round(  ((sqrt(this.uieNumBlocks.get()) + 1)/2  ))*2 - 1;
                         this.uieNumBlocks.set(dVal^2);
                     end
                     
@@ -387,15 +390,16 @@ classdef uizpgen < mic.Base
 %             this.uieApodMag.build(this.hFigure, dCol1, 14*dYWid, 75, 30);
 %             
 %             this.uipApodFn.build(this.hFigure, dCol2, 14*dYWid, 150, 30);
-            this.uicbCenterOffaxisZP.build(this.hFigure, dCol5, 15*dYWid + 10, 115, 30);
 
             
 %             this.uieDoseBiasScaling.build(this.hFigure, dCol1, 15*dYWid, 75, 30);
 %             this.uieMultiplePatN.build(this.hFigure, dCol2, 15*dYWid, 75, 30);
 %             this.uieMultiplePatIdx.build(this.hFigure, dCol3, 15*dYWid, 75, 30);
-            this.uieBlockSize.build(this.hFigure, dCol1, 15*dYWid, 75, 30);
-            this.uieNumBlocks.build(this.hFigure, dCol2, 15*dYWid, 75, 30);
-            this.uicbRandomizeWRVZones.build(this.hFigure, dCol3, 15*dYWid + 10, 150, 30);
+            this.uieBlockSize.build(this.hFigure, dCol1, 15*dYWid, 150, 30);
+            this.uieNumBlocks.build(this.hFigure, dCol3, 15*dYWid, 150, 30);
+            this.uicbRandomizeWRVZones.build(this.hFigure, dCol5, 15*dYWid + 10, 150, 30);
+            this.uicbCenterOffaxisZP.build(this.hFigure, dCol5, 16*dYWid -5, 115, 30);
+
             
             this.uieLayerNumber.build(this.hFigure, dCol1, 16*dYWid, 75, 30);
             %this.uicbCurl.build(this.hFigure, dCol2, 16*dYWid + 10, 75, 30);
@@ -521,9 +525,13 @@ classdef uizpgen < mic.Base
             else
                 cPerlStr = 'perl';
             end
-             % Execute optional PERL scripts for WRV processing
+            
+            
+            % Execute optional PERL scripts for WRV/NWA processing 
+            dNBlocks = round(sqrt(this.uieNumBlocks.get()));
+            sFilePath = ['src/ZPFiles/' regexprep(this.uieZPName.get(), '\s', '_')];
             if this.uipFileOutput.getSelectedIndex() == uint8(4)
-                sFilePath = ['src/ZPFiles/' regexprep(this.uieZPName.get(), '\s', '_')];
+                
                 % Zone randomization:
                 if this.uicbRandomizeWRVZones.get()
                     fprintf('Randomizing zones...\n\n');
@@ -539,13 +547,13 @@ classdef uizpgen < mic.Base
                 end
                 
                 % Splitting into multiple fields:
-                dVal = round(sqrt(this.uieNumBlocks.get()));
-                if dVal > 1
+               
+                if dNBlocks > 1
                     fprintf('Splitting WRV into fields...\n\n');
                     cExStr = sprintf('%s %s %s.wrv %d %d %s_multifield.wrv', ...
                         cPerlStr, ...
                         fullfile(this.cDirThis, '..', 'bin', 'splitWRVtoFieldsByFile.pl'), ... 
-                        sFilePath, dVal, this.uieBlockSize.get(), sFilePath);
+                        sFilePath, dNBlocks, this.uieBlockSize.get(), sFilePath);
                     system(cExStr);
                     fprintf('Exec perl command: \n\t%s\n\n', cExStr);
                     fprintf('Field splitting complete...\n\n');
@@ -556,14 +564,33 @@ classdef uizpgen < mic.Base
                     cExStr = sprintf('%s %s %s.wrv %d %d %s_multifield.wrv', ...
                         cPerlStr, ...
                         fullfile(this.cDirThis, '..', 'bin', 'combineFiles.pl'), ... 
-                        sFilePath, dVal, this.uieBlockSize.get(), sFilePath);
+                        sFilePath, dNBlocks, this.uieBlockSize.get(), sFilePath);
                     system(cExStr);
                     fprintf('Exec perl command: \n\t%s\n\n', cExStr);
                     fprintf('Field splitting complete...\n\n');
                 end
                 
-               
-                
+            end
+            
+            if this.uipFileOutput.getSelectedIndex() == uint8(1) && dNBlocks > 1
+                fprintf('Splitting NWA into fields...\n\n');
+                    cExStr = sprintf('%s %s %s.nwa %d %d %s_multifield.nwa', ...
+                        cPerlStr, ...
+                        fullfile(this.cDirThis, '..', 'bin', 'splitNWAtoFieldsByFile.pl'), ... 
+                        sFilePath, dNBlocks, this.uieBlockSize.get(), sFilePath);
+                    system(cExStr);
+                    fprintf('Exec perl command: \n\t%s\n\n', cExStr);
+                    fprintf('Field splitting complete...\n\n');
+                    
+                     % Combine files
+                    fprintf('Combining NWAs...\n\n');
+                    cExStr = sprintf('%s %s %s_multifield.nwa %d %d %s_multifield.nwa', ...
+                        cPerlStr, ...
+                        fullfile(this.cDirThis, '..', 'bin', 'combineFilesNWA.pl'), ... 
+                        sFilePath, dNBlocks, this.uieBlockSize.get(), sFilePath);
+                    system(cExStr);
+                    fprintf('Exec perl command: \n\t%s\n\n', cExStr);
+                    fprintf('Field splitting complete...\n\n');
                 
             end
             
