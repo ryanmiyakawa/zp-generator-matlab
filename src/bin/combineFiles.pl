@@ -13,7 +13,7 @@ $trapCt = 0;
 
 for (my $kr = 0; $kr < $nBlockSide; $kr++){
     for (my $kc = 0; $kc < $nBlockSide; $kc++){
-        print OUTFILE "\n\nfield $kc $kr\n";
+       
 
 
         my $subFileName = $ARGV[3]."_$kr"."_$kc";
@@ -24,7 +24,12 @@ for (my $kr = 0; $kr < $nBlockSide; $kr++){
         my @lines = ();
 
         while (<FILE>){
+
             $trapCt++;
+            if ($trapCt == 1){
+               print OUTFILE "\n\nfield $kc $kr\n";
+            }
+            
             if ($trapCt % 200000 == 0 && $trapCt > 0){
                 print "Processed $trapCt lines.\n";
             }
