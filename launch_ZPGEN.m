@@ -1,9 +1,7 @@
 % Add zpgen src to path
 addpath(genpath('src'));
 
-% Add MIC to path
-cMICDir = fullfile('src','vendor', 'github', 'matlab-instrument-control', 'src');
-addpath(genpath(cMICDir));
+mpm addpath
 
 
 zpg = zpgen.uizpgen();

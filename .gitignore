@@ -7,3 +7,4 @@ vendor
 *.txt
 *.csv
 *.exe
+mpm-packages
