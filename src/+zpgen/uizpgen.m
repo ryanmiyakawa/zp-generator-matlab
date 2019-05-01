@@ -1,7 +1,13 @@
-% UI for creating ZPGen scripts locally.  CPP source code and git repo are
-% here: /Users/rhmiyakawa/Documents/Xcode/zpgen/ZPGen/ZPGen/ZPGen
-
+% UI for creating ZPGen scripts locally.  Launch using launch_ZPGEN.m
+% script.  Converted to MPM package on 04/14/2019 and it now includes ZPGen
+% C++ script as a dependency.  ZPGen requires a working ZPGenPlus
+% executable which can be built using the "make" command for unix machines
+% running gcc C++ compiler.  This file may need to be modified to
+% accommodate different setups
+%
 % Changelog:
+% 2.8.1: Turning on ZPC phase and adding options for horizontal and
+% vertical strip zone plates
 %
 % 2.8.0: adding block partitioning for NWA files
 %
@@ -133,7 +139,7 @@ classdef uizpgen < mic.Base
             
             this.uieCraAz               = mic.ui.common.Edit('cLabel', 'CRA Az (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieCraAngle            = mic.ui.common.Edit('cLabel', 'CRA (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb);
-            this.uieZPPhase             = mic.ui.common.Edit('cLabel', 'ZPC Phase (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            this.uieZPPhase             = mic.ui.common.Edit('cLabel', 'ZPC Ph. (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieApodMag             = mic.ui.common.Edit('cLabel', 'Apodization Mag', 'cType', 'd', 'fhDirectCallback', @this.cb);
             
             this.uipApodFn              = mic.ui.common.Popup('cLabel', 'Apodization fn', 'ceOptions', {'None', 'Hamming', 'Gaussian'}, ...
@@ -152,7 +158,8 @@ classdef uizpgen < mic.Base
                                                             
             this.uipCustomMask          = mic.ui.common.Popup('cLabel', 'Custom mask', 'ceOptions',{'None', 'Intel MET AIS Tripole', 'TDS Config ZP2' ...
                                                             'TDS Config ZP3', 'TDS Config ZP4', '5-Square', '5-Square 45'...
-                                                            'Flip align', 'Octopole', 'Concentric rings', 'Octal Rays', 'Square'}, ...
+                                                            'Flip align', 'Octopole', 'Concentric rings', 'Octal Rays', 'Square', ...
+                                                            'Horizontal Strip', 'Vertical Strip'}, ...
                                                                 'fhDirectCallback', @this.cb);
                                                             
                                                         
@@ -382,9 +389,9 @@ classdef uizpgen < mic.Base
             this.uipCustomMask.build(this.hFigure, dCol1, 12*dYWid, 250, 30);
                         
             this.uieObscurationSigma.build(this.hFigure, dCol1, 13*dYWid, 75, 30);
-%             this.uieZPCR1.build(this.hFigure, dCol2, 13*dYWid, 75, 30);
-%             this.uieZPCR2.build(this.hFigure, dCol3, 13*dYWid, 75, 30);
-%             this.uieZPPhase.build(this.hFigure, dCol4, 13*dYWid, 75, 30);
+            this.uieZPCR1.build(this.hFigure, dCol2, 14*dYWid, 75, 30);
+            this.uieZPCR2.build(this.hFigure, dCol3, 14*dYWid, 75, 30);
+            this.uieZPPhase.build(this.hFigure, dCol4, 14*dYWid, 75, 30);
             this.uieAnamorphicFac.build(this.hFigure, dCol2, 13*dYWid, 90, 30);
             
 %             this.uieApodMag.build(this.hFigure, dCol1, 14*dYWid, 75, 30);
@@ -643,7 +650,7 @@ classdef uizpgen < mic.Base
             % Anamorphic factor
             sParams = [sParams sprintf(' %0.4f ', this.uieAnamorphicFac.get())];
             % Phase of zernike region (deg)
-            sParams = [sParams sprintf(' %0.4f ', this.uieZPPhase.get())];
+            sParams = [sParams sprintf(' %0.4f ', this.uieZPPhase.get() * pi/180 )];
             % Apodization of central reg [1]
             sParams = [sParams sprintf(' %0.4f ', this.uieApodMag.get())];
             % Apd Fn (1=ham, 2=gaus)

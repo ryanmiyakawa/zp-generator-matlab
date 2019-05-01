@@ -1,4 +1,6 @@
 {
-	"dependencies":["matlab_instrument_control",
-	"zpgen"]
+	"dependencies":[
+		"matlab_instrument_control",
+		"zpgen"
+	]
 }
