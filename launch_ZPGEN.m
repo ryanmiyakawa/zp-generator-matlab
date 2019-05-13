@@ -1,7 +1,11 @@
 % Add zpgen src to path
+
+mpm clearpath
+mpm addpath
+
 addpath(genpath('src'));
 
-mpm addpath
+
 
 
 zpg = zpgen.uizpgen();
