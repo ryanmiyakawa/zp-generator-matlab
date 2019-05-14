@@ -6,6 +6,8 @@
 % accommodate different setups
 %
 % Changelog:
+% 2.8.2: Adding spiral phase option
+%
 % 2.8.1: Turning on ZPC phase and adding options for horizontal and
 % vertical strip zone plates
 %
@@ -28,7 +30,7 @@ classdef uizpgen < mic.Base
 
     
     properties (Constant)
-        cBuildName = 'ZPGen v2.8.0';
+        cBuildName = 'ZPGen v2.8.2';
         
         dWidth  = 600;
         dHeight =  900;
@@ -162,7 +164,7 @@ classdef uizpgen < mic.Base
             this.uipCustomMask          = mic.ui.common.Popup('cLabel', 'Custom mask', 'ceOptions',{'None', 'Intel MET AIS Tripole', 'TDS Config ZP2' ...
                                                             'TDS Config ZP3', 'TDS Config ZP4', '5-Square', '5-Square 45'...
                                                             'Flip align', 'Octopole', 'Concentric rings', 'Octal Rays', 'Square', ...
-                                                            'Horizontal Strip', 'Vertical Strip'}, ...
+                                                            'Horizontal Strip', 'Vertical Strip', 'Spiral phase'}, ...
                                                                 'fhDirectCallback', @this.cb);
                                                             
                                                         
