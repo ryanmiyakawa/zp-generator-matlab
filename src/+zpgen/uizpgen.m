@@ -100,6 +100,9 @@ classdef uizpgen < mic.Base
         cExecStr = []
         cLogStr = ''
         arch = computer('arch')
+        
+        cZPGenDir = fullfile(fileparts(mfilename('fullpath')), '..');
+        cOutputFileDir = '';
     end
     
     properties (SetAccess = private)
@@ -252,33 +255,43 @@ classdef uizpgen < mic.Base
             for k = 1:2:length(varargin)
                 switch varargin{k}
                     case 'NA'
-                        this.uieNA.setVal(varargin{k+1});
+                        this.uieNA.set(varargin{k+1});
                     case 'lambda'
-                        this.uieLambda.setVal(varargin{k+1});
+                        this.uieLambda.set(varargin{k+1});
                     case 'P'
-                        this.uieP.setVal(varargin{k+1});
+                        this.uieP.set(varargin{k+1});
                     case 'Q'
-                        this.uieQ.setVal(varargin{k+1});
+                        this.uieQ.set(varargin{k+1});
                     case 'CRA'
-                        this.uieCraAngle.setVal(varargin{k+1});
+                        this.uieCraAngle.set(varargin{k+1});
                     case 'zernikes'
-                        this.uieZernikes.setVal(varargin{k+1});
+                        this.uieZernikes.set(varargin{k+1});
                     case 'customMask'
-                        this.uipCustomMask.u8Selected = uint8(varargin{k+1});
+                        this.uipCustomMask.setSelectedIndex(uint8(varargin{k+1}))
                     case 'CRAAz'
-                        this.uieCraAz.setVal(varargin{k+1});
+                        this.uieCraAz.set(varargin{k+1});
                     case 'zoneBias'
-                        this.uieZoneBias.setVal(varargin{k+1});
+                        this.uieZoneBias.set(varargin{k+1});
                     case 'obscuration'
-                        this.uieObscurationSigma.setVal(varargin{k+1});
+                        this.uieObscurationSigma.set(varargin{k+1});
+                    case 'zpcR1'
+                        this.uieZPCR1.set(varargin{k+1});
+                    case 'zpcR2'
+                        this.uieZPCR2.set(varargin{k+1});
+                    case 'zpcPhase'
+                        this.uieZPPhase.set(varargin{k+1});
                     case 'name'
-                        this.uieZPName.setVal(varargin{k+1});
+                        this.uieZPName.set(varargin{k+1});
                     case 'zTol'
-                        this.uieZoneTol.setVal(varargin{k+1});
+                        this.uieZoneTol.set(varargin{k+1});
                     case 'anamorphicFac'
-                        this.uieAnamorphicFac.setVal(varargin{k+1});
+                        this.uieAnamorphicFac.set(varargin{k+1});
                     case 'paramW'
-                        this.uieButtressW.setVal(varargin{k+1});
+                        this.uieButtressW.set(varargin{k+1});
+                    case 'outputIdx'
+                        this.uipFileOutput.setSelectedIndex(uint8(varargin{k+1}))
+                    case 'centerZP'
+                        this.uicbCenterOffaxisZP.set(varargin{k+1});
                 end
             end
                 
@@ -438,8 +451,14 @@ classdef uizpgen < mic.Base
         
         function load(this, path)
             if (nargin == 1)
-            [d, p] = uigetfile('src/recipes/*.mat');
-            load([p, d]);
+                cPath = fullfile(this.cZPGenDir, 'recipes', '*.mat');
+                [d, p] = uigetfile(cPath);
+                
+                if isempty(d)
+                    return
+                end
+                
+                load([p, d]);
             else
                 load(path);
             end
@@ -490,8 +509,8 @@ classdef uizpgen < mic.Base
             1    
             end
             
-            [d, p] = uiputfile(['src/recipes/' regexprep(this.uieZPName.get(), '\s', '_') '.mat']);
-            save([p d], 'sSaveStruct');
+            cPath = fullfile(this.cZPGenDir, 'recipes', [regexprep(this.uieZPName.get(), '\s', '_') '.mat']);
+            save(cPath, 'sSaveStruct');
         end
         
 
@@ -512,7 +531,8 @@ classdef uizpgen < mic.Base
             end
             
             % log item:
-            sFileName = sprintf('src/logs/ZPLog_%s.csv', datestr(now, 29));
+            sFileName = fullfile(this.cZPGenDir, 'logs', sprintf('ZPLog_%s.csv', datestr(now, 29)));
+%             sFileName = sprintf('src/logs/ZPLog_%s.csv', datestr(now, 29));
             % check if file exists:
             if isempty(dir(sFileName)) % doesn't exist
                 zpgen.writeLog(sFileName, this.ceHeaders, true);
@@ -536,7 +556,14 @@ classdef uizpgen < mic.Base
             
             % Execute optional PERL scripts for WRV/NWA processing 
             dNBlocks = round(sqrt(this.uieNumBlocks.get()));
-            sFilePath = ['src/ZPFiles/' regexprep(this.uieZPName.get(), '\s', '_')];
+            
+            if isempty(this.cOutputFileDir)
+                sFilePath = fullfile(this.cZPGenDir, 'ZPFiles', regexprep(this.uieZPName.get(), '\s', '_'));
+            else
+                sFilePath = fullfile(this.cOutputFileDir, regexprep(this.uieZPName.get(), '\s', '_'));
+            end
+            
+            
             if this.uipFileOutput.getSelectedIndex() == uint8(4)
                 
                 % Zone randomization:
@@ -611,8 +638,14 @@ classdef uizpgen < mic.Base
                 sPrefix = [cd '\src\bin\ZPGen.exe '];
                 sFilePath = regexprep(this.uieZPName.get(), '\s', '_');
             else
-                sPrefix = './src/bin/ZPGen ';
-                sFilePath = ['src/ZPFiles/' regexprep(this.uieZPName.get(), '\s', '_')];
+                sPrefix =  fullfile(this.cZPGenDir, 'bin', 'ZPGen');
+                
+                if isempty(this.cOutputFileDir)
+                    sFilePath = fullfile(this.cZPGenDir, 'ZPFiles', regexprep(this.uieZPName.get(), '\s', '_'));
+                else
+                    sFilePath = fullfile(this.cOutputFileDir, regexprep(this.uieZPName.get(), '\s', '_'));
+                end
+                
             end
             
             
