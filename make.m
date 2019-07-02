@@ -1,1 +1,1 @@
-!gcc mpm-packages/zpgen/zpGenPlus.cpp -o src/bin/ZPGen
+!gcc mpm-packages/zpgen/src/zpGenPlus.cpp -o src/bin/ZPGen
