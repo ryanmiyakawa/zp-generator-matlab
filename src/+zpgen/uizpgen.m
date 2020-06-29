@@ -757,6 +757,21 @@ classdef uizpgen < mic.Base
             logItem = [ this.uieZPName.get(), ',', this.cBuildName, ',', regexprep(sParams, '\s\s', ','), ',', this.cExecStr];
             this.cLogStr = logItem; 
             
+            % Echo string arguments to console for use in vscode argument
+            % array:
+            
+            ceParamArray = split(sParams, ' ');
+            sParamQt = '[';
+            for k = 1:length(ceParamArray)
+                if (length(ceParamArray{k}) > 0)
+                    sParamQt = [sParamQt '"' ceParamArray{k} '", '];
+                end
+            end
+            sParamQt = [sParamQt '"out"]'];
+            
+            fprintf('Param argument array:\n%s\n\n', sParamQt);
+            
+            
             
            
             
