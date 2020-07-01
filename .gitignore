@@ -8,3 +8,4 @@ vendor
 *.csv
 *.exe
 mpm-packages
+src/recipes/*.mat

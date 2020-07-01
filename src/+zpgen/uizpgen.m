@@ -308,6 +308,8 @@ classdef uizpgen < mic.Base
                         this.uipFileOutput.setSelectedIndex(uint8(varargin{k+1}))
                     case 'centerZP'
                         this.uicbCenterOffaxisZP.set(varargin{k+1});
+                    case 'randomizeZones'
+                        this.uicbRandomizeWRVZones.set(varargin{k+1});
                 end
             end
                 
