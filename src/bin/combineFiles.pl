@@ -33,8 +33,15 @@ for (my $kr = 0; $kr < $nBlockSide; $kr++){
             if ($trapCt % 200000 == 0 && $trapCt > 0){
                 print "Processed $trapCt lines.\n";
             }
-            # push(@lines, $_);
+
             print OUTFILE "$_";
+            # if ($_ =~ /Trap/){
+            #   print OUTFILE "$_";
+            # } else {
+            #   # print "invalid line [$kr, $kc] $_\n"
+            # }
+            # # push(@lines, $_);
+            
         }
 
         # # Delete the sub file:

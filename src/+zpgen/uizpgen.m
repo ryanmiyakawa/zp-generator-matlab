@@ -257,7 +257,7 @@ classdef uizpgen < mic.Base
             this.uieButtressW.set(0.6);
             this.uieButtressT.set(6);
             this.uieDoseBiasScaling.set(1);
-            this.uieBlockSize.set(1e6);
+            this.uieBlockSize.set(8e5);
             this.uieNumBlocks.set(1);
             this.uieMultiplePatN.set(1);
             this.uieMultiplePatIdx.set(1);
@@ -317,6 +317,7 @@ classdef uizpgen < mic.Base
             switch src
                 case this.uibGenerate
                     this.generate();
+                    
                 case this.uibLoad
                     this.load();
                     this.stageZP();
@@ -326,6 +327,7 @@ classdef uizpgen < mic.Base
                     this.stageZP();
                 case this.uibStageAndGenerate
                     this.stageAndGenerate();
+                
                 case this.uibOpenInFinder
                     if strcmp(this.arch, 'win64')
                         system(sprintf('explorer %s', fullfile(this.cDirThis, '..', 'ZPFiles')));
@@ -348,6 +350,10 @@ classdef uizpgen < mic.Base
                     if round(sqrt(dVal))^2 ~= dVal || mod(sqrt(dVal), 2) ~= 1
                         dVal = round(  ((sqrt(this.uieNumBlocks.get()) + 1)/2  ))*2 - 1;
                         this.uieNumBlocks.set(dVal^2);
+                    end
+                    if dVal > 1
+                       % set blocksize to 800k
+                       this.uieBlockSize.set(800000);
                     end
                     
             
@@ -535,7 +541,7 @@ classdef uizpgen < mic.Base
             
             cExecSt = this.uieExecStr.get();
             
-            
+        
             
             
             if (this.uicbComputeExternally.get()) && this.uipFileOutput.getSelectedIndex() ~= uint8(4) % can't compute WRV externally if we need to run perl scripts
@@ -649,6 +655,12 @@ classdef uizpgen < mic.Base
         end
         
         function stageZP(this)
+            
+            % Do some checks:
+            if this.uieNumBlocks.get() > 1 && this.uieBlockSize.get() > 800000
+                warndlg('WRV Blocksize must be 800,000 or less to prevent overrun.  Aborting stage');
+                return
+            end
             
             if strcmp(this.arch, 'win64')
                 sPrefix = [cd '\src\bin\ZPGen.exe '];
