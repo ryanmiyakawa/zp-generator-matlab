@@ -1,6 +1,8 @@
 {
 	"dependencies":[
 		"matlab_instrument_control",
-		"zpgen"
+		"zpgen",
+		"gds_diffraction",
+		"ryan_toolbox"
 	]
 }
