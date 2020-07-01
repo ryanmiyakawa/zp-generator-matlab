@@ -10,6 +10,7 @@ $nBlockSide = $ARGV[1];
 $blockSize = $ARGV[2];
 
 $trapCt = 0;
+$totalTrapCt = 0;
 
 for (my $kr = 0; $kr < $nBlockSide; $kr++){
     for (my $kc = 0; $kc < $nBlockSide; $kc++){
@@ -26,23 +27,22 @@ for (my $kr = 0; $kr < $nBlockSide; $kr++){
         while (<FILE>){
 
             $trapCt++;
+            $totalTrapCt++;
+
             if ($trapCt == 1){
                print OUTFILE "\n\nfield $kc $kr\n";
             }
             
-            if ($trapCt % 200000 == 0 && $trapCt > 0){
-                print "Processed $trapCt lines.\n";
+            if ($totalTrapCt % 200000 == 0 && $totalTrapCt > 0){
+                print "Processed $totalTrapCt lines.\n";
             }
 
             print OUTFILE "$_";
-            # if ($_ =~ /Trap/){
-            #   print OUTFILE "$_";
-            # } else {
-            #   # print "invalid line [$kr, $kc] $_\n"
-            # }
-            # # push(@lines, $_);
+     
             
         }
+
+        $trapCt = 0;
 
         # # Delete the sub file:
         unlink($subFileName);
@@ -52,4 +52,4 @@ for (my $kr = 0; $kr < $nBlockSide; $kr++){
 
 
 
-print "\nProcessing of WRV file @ARGV[0] complete.  Processed clock speeds on $trapCt shapes.\n\n";
+print "\nProcessing of WRV file @ARGV[0] complete.  Processed clock speeds on $totalTrapCt shapes.\n\n";

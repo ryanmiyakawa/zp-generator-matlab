@@ -13,7 +13,7 @@ $blockSize = $ARGV[2];
 
 my $trapCt = 0;
 
-my $blockExpandFactor = 1.1; # How much to expand blocksize to accommodate spillover at field boundaries
+my $blockExpandFactor = 1.25; # How much to expand blocksize to accommodate spillover at field boundaries
 
 # Build 2D array for blocks_ref
 my @files_ref = ();
@@ -34,9 +34,6 @@ my $negCt = 0;
 my $ct = 0;
 
 while (<WRVSRC>) {
-    
-    
-    
 
     if ($_ =~ m/patdef/){
         # Expand block size by 10%:
@@ -87,9 +84,6 @@ while (<WRVSRC>) {
 
         next if !($_ =~ m/Trap/);
 
-        if ($kc == 0 and $kr == 0 and $ct++ == 32047){
-            print "line 32047 on file [0][0]\n";
-        }
         # Rebuild line using elements:
         my $fh = $files_ref[$kr * $nBlockSide + $kc];
         print $fh "$offsetLine";
