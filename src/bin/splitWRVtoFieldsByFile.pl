@@ -67,7 +67,7 @@ while (<WRVSRC>) {
         $y2 -= $kr * $blockSize;
 
         if ($x1 < 0 or $x2 < 0 or $x3 < 0 or $x4 < 0 or $y1 < 0 or $y2 < 0){
-            print "WARNING, negative value on line $.:";
+            print "WARNING, negative value on line $.:\n";
             print " Original line: x1: $3, x2: $5, x3: $7, x4: $8, y1: $4, y2: $6; Blocksize: $blockSize\n";
             $negCt++;
         }
@@ -78,7 +78,7 @@ while (<WRVSRC>) {
         my $offsetLine = "$1$2 $x1 $y1 $x2 $y2 $x3 $x4\n";
 
         if ($offsetLine =~ m/ 0 0 0 0 0 0/){
-            print "WARNING: negative clock detected, skipping this shape;";
+            print "WARNING: negative clock detected, skipping this shape;\n";
             next;
         }
 
