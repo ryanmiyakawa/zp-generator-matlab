@@ -315,7 +315,7 @@ classdef uizpgen < mic.Base
                     case 'randomizeZones'
                         this.uicbRandomizeWRVZones.set(varargin{k+1});
                     case 'buttressing'
-                        this.uip.uipButtressIdx(uint8(varargin{k+1}))
+                        this.uipButtressIdx.setSelectedIndex(uint8(varargin{k+1}))
                 end
             end
                 
