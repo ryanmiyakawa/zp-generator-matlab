@@ -314,6 +314,10 @@ classdef uizpgen < mic.Base
                         this.uicbCenterOffaxisZP.set(varargin{k+1});
                     case 'randomizeZones'
                         this.uicbRandomizeWRVZones.set(varargin{k+1});
+                    case 'buttressing'
+                        this.uipButtressIdx.setSelectedIndex(uint8(varargin{k+1}))
+                    case 'reverseTone'
+                        this.uicbReverseTone.set(varargin{k+1})
                 end
             end
                 
