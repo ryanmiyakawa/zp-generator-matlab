@@ -32,7 +32,7 @@ classdef uizpgen < mic.Base
     properties (Constant)
         cBuildName = 'ZPGen v2.8.2';
         
-        dWidth  = 600;
+        dWidth  = 1200;
         dHeight =  900;
         ceHeaders = {'File name', 'Build version', 'Zone tolerance', 'lambda (nm)', 'P (um)', 'Q (um)', 'Obscuration sigma', 'NA', 'Zernikes', ...
                 'Custom mask index', 'ZP tilt (rad)', 'Azimuthal (deg)', 'CRA (deg)', 'Anamorphic fac', ...
@@ -55,7 +55,8 @@ classdef uizpgen < mic.Base
                                 'Horizontal Strip', ...
                                 'Vertical Strip', ...
                                 'Spiral phase', ...
-                                'Black ring 0.95'};
+                                'Black ring 0.95', ...
+                                'Obscuration Only'};
     end
     
     properties
@@ -64,6 +65,8 @@ classdef uizpgen < mic.Base
         hFigure     % Main figure (not overwritable)
         
         bIgnoreFileFormatOnLoad = false
+        
+        uiZPPropagator
         
         cDirThis
         
@@ -145,7 +148,8 @@ classdef uizpgen < mic.Base
         function init(this)
             [this.cDirThis, cName, cExt] = fileparts(mfilename('fullpath'));
            
-            
+            this.uiZPPropagator         = GDS.ui.GDS_Propagation;
+
             this.uieZoneTol             = mic.ui.common.Edit('cLabel', 'Zone Tol', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieLambda              = mic.ui.common.Edit('cLabel', 'Lambda (nm)', 'cType', 'd', 'fhDirectCallback', @this.cb);
             
@@ -390,6 +394,9 @@ classdef uizpgen < mic.Base
             dCol5 = 430;
             
             dYWid = 45;
+            
+            % build ZPpropagator:
+%             this.uiZPPropagator.build(this.hFigure, 500, 20);
             
                         
             this.uieZPName.build(this.hFigure, dCol1, dYWid, 200, 30);
@@ -703,7 +710,7 @@ classdef uizpgen < mic.Base
             % zernike string
             sParams = [sParams this.makeZrnStr()];
             % custom Mask
-            sParams = [sParams sprintf(' %0.4f ', this.uipCustomMask.getSelectedIndex() - 1)];
+            sParams = [sParams sprintf(' %d ', this.uipCustomMask.getSelectedIndex() - 1)];
             % Tilted zp plane (about x-axis) (deg)
             sParams = [sParams sprintf(' %0.4f ', this.uieZPTilt.get() * pi/180)];
             % CRA azimuthal (degrees)
