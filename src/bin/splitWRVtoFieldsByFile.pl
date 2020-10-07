@@ -16,10 +16,9 @@ my $trapCt = 0;
 my $blockExpandFactor = 1.25; # How much to expand blocksize to accommodate spillover at field boundaries
 
 # Shift all shapes by this offset factor to accomodate for reduced block size
-my $centerOffset = ($blockExpandFactor - 1)/$blockExpandFactor  * $blockSize/2 * $nBlockSide;
+my $centerOffset = ($blockExpandFactor - 1)  * $blockSize/2 * $nBlockSide;
 
-
-print "Recentering WRV file by [$centerOffset, $centerOffset]\n";
+print "Recentering WRV file by [$centerOffset, $centerOffset] dbUnits\n";
 
 
 # Build 2D array for blocks_ref
