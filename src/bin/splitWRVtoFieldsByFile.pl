@@ -15,6 +15,9 @@ my $trapCt = 0;
 
 my $blockExpandFactor = 1.25; # How much to expand blocksize to accommodate spillover at field boundaries
 
+# Shift all shapes by this offset factor to accomodate for reduced block size
+my $centerOffset = ($blockExpandFactor - 1)/$blockExpandFactor  * $blockSize/2 * $nBlockSide;
+
 # Build 2D array for blocks_ref
 my @files_ref = ();
 for (my $kr = 0; $kr < $nBlockSide; $kr++){
@@ -47,14 +50,14 @@ while (<WRVSRC>) {
     } elsif ($_ =~ m/Trap/){
         $trapCt++;
         $_ =~ m/^\s*(\w+)(\/\d+)?\s(\d+\.?\d*)\s(\d+)\s(\d+)\s?(\d+\.?\d*)?\s*(\d+\.?\d*)?\s?(\d*)\s?(\d*)\s?(\d*)\s?(\d*)\s?(\d*)\s?(\d*)/;
-        $x1 = $3;
-        $x2 = $5;
-        $x3 = $7;
-        $x4 = $8;
-        $y1 = $4;
-        $y2 = $6;
+        $x1 = $3 + $centerOffset;
+        $x2 = $5 + $centerOffset;
+        $x3 = $7 + $centerOffset;
+        $x4 = $8 + $centerOffset;
+        $y1 = $4 + $centerOffset;
+        $y2 = $6 + $centerOffset;
 
-        
+         
 
         $kc = floor(min($x1, $x2, $x3, $x4) / $blockSize);
         $kr = floor(min($y1, $y2) / $blockSize);
