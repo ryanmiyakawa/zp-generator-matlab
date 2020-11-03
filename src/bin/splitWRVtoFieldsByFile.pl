@@ -17,9 +17,9 @@ my $blockExpandFactor = 1.25; # How much to expand blocksize to accommodate spil
 
 # Shift all shapes by this offset factor to accomodate for reduced block size
 my $centerOffset = ($blockExpandFactor - 1)  * $blockSize/2 * $nBlockSide;
+$centerOffset = 0;
 
 print "Recentering WRV file by [$centerOffset, $centerOffset] dbUnits\n";
-
 
 # Build 2D array for blocks_ref
 my @files_ref = ();
