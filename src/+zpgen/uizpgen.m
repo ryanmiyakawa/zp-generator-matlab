@@ -6,6 +6,12 @@
 % accommodate different setups
 %
 % Changelog:
+%
+% 2.9.1: Fixing bug with aperture boundaries 
+%
+% 2.9.0: Refactoring pupil coordinate computation and allowing for filled
+% obscurations
+%
 % 2.8.2: Adding spiral phase option
 %
 % 2.8.1: Turning on ZPC phase and adding options for horizontal and
@@ -30,7 +36,7 @@ classdef uizpgen < mic.Base
 
     
     properties (Constant)
-        cBuildName = 'ZPGen v2.8.2';
+        cBuildName = 'ZPGen v2.9.1';
         
         dWidth  = 1200;
         dHeight =  900;
