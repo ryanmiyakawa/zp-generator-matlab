@@ -7,6 +7,10 @@
 %
 % Changelog:
 %
+% 2.10.0: Adding infinite conjugate, 4xNA and D (zone plate diameter)
+%
+% 2.9.2: Adding dr and photon energy
+%
 % 2.9.1: Fixing bug with aperture boundaries 
 %
 % 2.9.0: Refactoring pupil coordinate computation and allowing for filled
@@ -36,10 +40,11 @@ classdef uizpgen < mic.Base
 
     
     properties (Constant)
-        cBuildName = 'ZPGen v2.9.1';
+        cBuildName = 'ZPGen v2.10.0';
         
         dWidth  = 1200;
         dHeight =  900;
+        hc      = 1240.71
         ceHeaders = {'File name', 'Build version', 'Zone tolerance', 'lambda (nm)', 'P (um)', 'Q (um)', 'Obscuration sigma', 'NA', 'Zernikes', ...
                 'Custom mask index', 'ZP tilt (rad)', 'Azimuthal (deg)', 'CRA (deg)', 'Anamorphic fac', ...
                 'ZPC phase (deg)', 'ZPC apodization', 'Ap function', 'ZPC inner rad', 'ZPC outer rad', 'Zone bias (nm)', ...
@@ -82,6 +87,11 @@ classdef uizpgen < mic.Base
         uieQ
         uieObscurationSigma
         uieNA
+        uie4xNA
+        uitD
+        uitDLabel
+        uieEp
+        uieDr
         uieZernikes
         uieAlpha
         uieZPTilt
@@ -116,7 +126,7 @@ classdef uizpgen < mic.Base
         uibOpenInFinder
         
         uicbRandomizeWRVZones
-        
+        uicbInfiniteConjugate
 
         uibStageAndGenerate
         uibGenerate
@@ -157,12 +167,21 @@ classdef uizpgen < mic.Base
             this.uiZPPropagator         = GDS.ui.GDS_Propagation;
 
             this.uieZoneTol             = mic.ui.common.Edit('cLabel', 'Zone Tol', 'cType', 'd', 'fhDirectCallback', @this.cb);
-            this.uieLambda              = mic.ui.common.Edit('cLabel', 'Lambda (nm)', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            this.uieLambda              = mic.ui.common.Edit('cLabel', 'Lambda (nm)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
             
             this.uieP                   = mic.ui.common.Edit('cLabel', 'p (um)', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieQ                   = mic.ui.common.Edit('cLabel', 'q (um)', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            this.uicbInfiniteConjugate  = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Infinite conjugate', 'fhDirectCallback', @this.cb);
+
             this.uieObscurationSigma    = mic.ui.common.Edit('cLabel', 'Obscuration Sigma', 'cType', 'd', 'fhDirectCallback', @this.cb);
-            this.uieNA                  = mic.ui.common.Edit('cLabel', 'NA', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            this.uieNA                  = mic.ui.common.Edit('cLabel', 'NA', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            this.uie4xNA                  = mic.ui.common.Edit('cLabel', '4xNA', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            this.uitDLabel               = mic.ui.common.Text('cType', 'd', 'cVal', 'D (um)');
+            this.uitD                   = mic.ui.common.Text( 'cVal', '100', 'dFontSize', 14, 'cFontWeight', 'bold');
+            
+            this.uieEp                  = mic.ui.common.Edit('cLabel', 'Pht Energy (eV)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            this.uieDr                  = mic.ui.common.Edit('cLabel', 'dr (nm)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+
             
             this.uieAnamorphicFac       = mic.ui.common.Edit('cLabel', 'Anamorphic factor', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieZernikes            = mic.ui.common.Edit('cLabel', 'Zernike string', 'cType', 'c', 'fhDirectCallback', @this.cb);
@@ -238,10 +257,12 @@ classdef uizpgen < mic.Base
             this.uieZPName.set('Untitled');
             
             this.uieZoneTol.set(0.01);
-            this.uieNA.set(0.08);
             this.uieAnamorphicFac.set(1);
 
             this.uieLambda.set(13.5);
+            this.uieNA.set(0.08);
+
+            this.uieEp.set(this.hc/13.5);
             this.uieP.set(500);
             this.uieQ.set(1e10);
             
@@ -260,7 +281,6 @@ classdef uizpgen < mic.Base
             this.uieZoneBias.set(10);
             
             
-            
             this.uipButtressIdx.setSelectedIndex(uint8(1));
             this.uipNWAPxSize.setSelectedIndex(uint8(1));
             
@@ -274,6 +294,8 @@ classdef uizpgen < mic.Base
             this.uieLayerNumber.set(1);
                 
             this.uicbCenterOffaxisZP.set(true);
+            this.uicbInfiniteConjugate.set(false);
+            
             
         end
         
@@ -288,6 +310,10 @@ classdef uizpgen < mic.Base
                         this.uieP.set(varargin{k+1});
                     case 'Q'
                         this.uieQ.set(varargin{k+1});
+                    case 'dr'
+                        this.uieDr.set(varargin{k+1});
+                    case 'Ep'
+                        this.uieEp.set(varargin{k+1});
                     case 'CRA'
                         this.uieCraAngle.set(varargin{k+1});
                     case 'zernikes'
@@ -328,12 +354,64 @@ classdef uizpgen < mic.Base
             end
                 
         end
+        
+        function D = getD(this)
+            cra = this.uieCraAngle.get();
+            p = this.uieP.get();
+            na = this.uieNA.get();
+            naL = sind(cra) - na;
+            naH = sind(cra) + na;
+            
+            D = p*(tan(asin(naH)) - tan(asin(naL)));
+
+        end
      
         function cb(this, src, dat)
             switch src
                 case this.uibGenerate
                     this.generate();
                     
+                case this.uieCraAngle
+                    this.uitD.set(sprintf('%0.2f', this.getD()));
+                case this.uieP
+                    this.uitD.set(sprintf('%0.2f', this.getD()));
+                case this.uieNA
+                    this.uie4xNA.setWithoutNotify(this.uieNA.get()*4)
+                    setVal = this.uieLambda.get()/this.uieNA.get()/2;
+                    this.uieDr.setWithoutNotify(setVal)
+                    
+                    
+                    this.uitD.set(sprintf('%0.2f', this.getD()));
+                case this.uie4xNA
+                    this.uieNA.setWithoutNotify(this.uie4xNA.get()/4)
+                    setVal = this.uieLambda.get()/this.uieNA.get()/2;
+                    this.uieDr.setWithoutNotify(setVal)
+                    
+                    this.uitD.set(sprintf('%0.2f', this.getD()));
+                case this.uieDr
+                    setVal = this.uieLambda.get()/this.uieDr.get()/2;
+                    this.uieNA.setWithoutNotify(setVal)
+                    this.uie4xNA.setWithoutNotify(setVal * 4)
+                    
+                    this.uitD.set(sprintf('%0.2f', this.getD()));
+                case this.uicbInfiniteConjugate
+                    
+                    if (this.uicbInfiniteConjugate.get())
+                        this.uieQ.setWithoutNotify(1e15);   
+                    end
+                    
+                case this.uieEp
+                    setVal = this.hc/this.uieEp.get();
+                    
+                    this.uieLambda.setWithoutNotify(setVal)
+                    
+                    % Call NA callback to reset Dr
+                    this.cb(this.uieNA);
+                case this.uieLambda
+                    setVal = this.hc/this.uieLambda.get();
+                    this.uieEp.setWithoutNotify(setVal)
+                    
+                    this.cb(this.uieNA);
                 case this.uibLoad
                     this.load();
                     this.stageZP();
@@ -422,10 +500,18 @@ classdef uizpgen < mic.Base
             this.uieZoneBias.build(this.hFigure, dCol2, 3*dYWid, 75, 30);
 
             this.uieLambda.build(this.hFigure, dCol1, 4*dYWid, 75, 30);
-            this.uieNA.build(this.hFigure, dCol2, 4*dYWid, 75, 30);
+            this.uieEp.build(this.hFigure, dCol2, 4*dYWid, 75, 30);
+            
+            this.uieNA.build(this.hFigure, dCol1, 5*dYWid, 75, 30);
+            this.uie4xNA.build(this.hFigure, dCol2, 5*dYWid, 75, 30);
 
-            this.uieP.build(this.hFigure, dCol1, 5*dYWid, 75, 30);
-            this.uieQ.build(this.hFigure, dCol2, 5*dYWid, 75, 30);
+            this.uieDr.build(this.hFigure, dCol3, 5*dYWid, 75, 30);
+            this.uitDLabel.build(this.hFigure, dCol4, 5*dYWid, 75, 30);
+            this.uitD.build(this.hFigure, dCol4, 5*dYWid + 20, 75, 30);
+
+            this.uieP.build(this.hFigure, dCol1, 6*dYWid, 75, 30);
+            this.uieQ.build(this.hFigure, dCol2, 6*dYWid, 75, 30);
+            this.uicbInfiniteConjugate.build(this.hFigure, dCol3, 6*dYWid + 10, 120, 30);
             
             this.uieCraAngle.build(this.hFigure, dCol1, 7*dYWid, 75, 30);
             this.uieCraAz.build(this.hFigure, dCol2, 7*dYWid, 75, 30);
@@ -435,7 +521,7 @@ classdef uizpgen < mic.Base
             this.uipButtressIdx.build(this.hFigure, dCol1, 9*dYWid, 150, 30);
             this.uieButtressW.build(this.hFigure, dCol3, 9*dYWid, 75, 30);
             this.uieButtressT.build(this.hFigure, dCol4, 9*dYWid, 75, 30);
-            this.uicbReverseTone.build(this.hFigure, dCol1, 10*dYWid+ 10, 120, 30);
+            this.uicbReverseTone.build(this.hFigure, dCol1, 10*dYWid + 10, 120, 30);
             
             
             this.uieZernikes.build(this.hFigure, dCol1, 11*dYWid, 300, 30);
@@ -505,6 +591,8 @@ classdef uizpgen < mic.Base
             end
             ceProps = fieldnames(sSaveStruct);
             
+            % Set some default params:
+            this.uicbInfiniteConjugate.set(false);
            
             
             for k = 1:length(ceProps)
@@ -527,6 +615,13 @@ classdef uizpgen < mic.Base
                     end
                 end
             end
+            
+            % Set lambda and NA to force compute dr and Ep
+            this.cb(this.uieLambda);
+            this.cb(this.uieNA);
+           
+            
+            
         end
         
         function save(this)
