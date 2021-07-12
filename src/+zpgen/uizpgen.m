@@ -7,6 +7,8 @@
 %
 % Changelog:
 %
+% 2.10.1: Adding ability to change WRV block unit size
+%
 % 2.10.0: Adding infinite conjugate, 4xNA and D (zone plate diameter)
 %
 % 2.9.2: Adding dr and photon energy
@@ -40,7 +42,7 @@ classdef uizpgen < mic.Base
 
     
     properties (Constant)
-        cBuildName = 'ZPGen v2.10.0';
+        cBuildName = 'ZPGen v2.10.1';
         
         dWidth  = 1200;
         dHeight =  900;
@@ -117,6 +119,8 @@ classdef uizpgen < mic.Base
         uicbCurl
         uipCustomMask
         uipNWAPxSize
+        
+        uieWRVBlockUnit
         
         uieAnamorphicFac
         uicbCenterOffaxisZP
@@ -221,8 +225,10 @@ classdef uizpgen < mic.Base
             this.uieButtressT           = mic.ui.common.Edit('cLabel', 'Buttress period param', 'cType', 'd', 'fhDirectCallback', @this.cb);
             
             this.uieDoseBiasScaling     = mic.ui.common.Edit('cLabel', 'Dose Bias Scaling', 'cType', 'd', 'fhDirectCallback', @this.cb);
-            this.uieBlockSize           = mic.ui.common.Edit('cLabel', 'WRV/NWA Block Size', 'cType', 'd', 'fhDirectCallback', @this.cb);
-            this.uieNumBlocks           = mic.ui.common.Edit('cLabel', 'Block N^2 (odd square)', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            this.uieBlockSize           = mic.ui.common.Edit('cLabel', 'WRV Block N px', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            this.uieNumBlocks           = mic.ui.common.Edit('cLabel', 'Block N^2 (odd sq.)', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            
+            this.uieWRVBlockUnit        = mic.ui.common.Edit('cLabel', 'Block unit (pm))', 'cType', 'd', 'fhDirectCallback', @this.cb);
             
             
             this.uieMultiplePatN        = mic.ui.common.Edit('cLabel', 'Multiple Patterning N', 'cType', 'd', 'fhDirectCallback', @this.cb);
@@ -279,6 +285,7 @@ classdef uizpgen < mic.Base
             this.uieZPCR1.set(0);
             this.uieZPCR2.set(0);
             this.uieZoneBias.set(10);
+            this.uieWRVBlockUnit.set(500);
             
             
             this.uipButtressIdx.setSelectedIndex(uint8(1));
@@ -542,8 +549,9 @@ classdef uizpgen < mic.Base
 %             this.uieDoseBiasScaling.build(this.hFigure, dCol1, 15*dYWid, 75, 30);
 %             this.uieMultiplePatN.build(this.hFigure, dCol2, 15*dYWid, 75, 30);
 %             this.uieMultiplePatIdx.build(this.hFigure, dCol3, 15*dYWid, 75, 30);
-            this.uieBlockSize.build(this.hFigure, dCol1, 15*dYWid, 150, 30);
-            this.uieNumBlocks.build(this.hFigure, dCol3, 15*dYWid, 150, 30);
+            this.uieBlockSize.build(this.hFigure, dCol1, 15*dYWid, 80, 30);
+            this.uieNumBlocks.build(this.hFigure, dCol2, 15*dYWid, 120, 30);
+            this.uieWRVBlockUnit.build(this.hFigure, dCol4, 15*dYWid, 80, 30);
             this.uicbRandomizeWRVZones.build(this.hFigure, dCol5, 15*dYWid + 10, 150, 30);
             this.uicbCenterOffaxisZP.build(this.hFigure, dCol5, 16*dYWid -5, 115, 30);
 
@@ -864,8 +872,12 @@ classdef uizpgen < mic.Base
             sParams = [sParams sprintf(' %d ', dVal)];
             
             
-            % CURL the zone plate generation status [1]
-            sParams = [sParams sprintf(' %d ', this.uipNWAPxSize.getSelectedIndex() - 1)];
+            % NWA pixel size or WRV pixel size 
+            if this.uipFileOutput.getSelectedIndex() == uint8(4)
+                sParams = [sParams sprintf(' %d ', this.uieWRVBlockUnit.get())];
+            else
+                sParams = [sParams sprintf(' %d ', this.uipNWAPxSize.getSelectedIndex() - 1)];
+            end
             
             
             
