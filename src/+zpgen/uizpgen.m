@@ -7,6 +7,9 @@
 %
 % Changelog:
 %
+% 2.11.0: Adding ability to compress files, logs all zps locally, removes
+% intermediate files
+%
 % 2.10.2: Resolving interaction between randomized and multifield
 %
 % 2.10.1: Adding ability to change WRV block unit size
@@ -44,16 +47,16 @@ classdef uizpgen < mic.Base
 
     
     properties (Constant)
-        cBuildName = 'ZPGen v2.10.2';
+        cBuildName = 'ZPGen v2.11.0';
         
         dWidth  = 1200;
         dHeight =  900;
         hc      = 1240.71
         ceHeaders = {'File name', 'Build version', 'Zone tolerance', 'lambda (nm)', 'P (um)', 'Q (um)', 'Obscuration sigma', 'NA', 'Zernikes', ...
-                'Custom mask index', 'ZP tilt (rad)', 'Azimuthal (deg)', 'CRA (deg)', 'Anamorphic fac', ...
+                'Custom mask index', 'ZP tilt (deg)', 'Azimuthal (deg)', 'CRA (deg)', 'Anamorphic fac', ...
                 'ZPC phase (deg)', 'ZPC apodization', 'Ap function', 'ZPC inner rad', 'ZPC outer rad', 'Zone bias (nm)', ...
                 'File format', 'Tone reversal', 'Buttressing', 'Buttress width', 'Buttress period', 'Off-axis centering', ...
-                'WRV blocksize', 'Multiple patterning N', 'Multiple patterning i', 'Layer number', 'Curl on', 'Exec string'};
+                'WRV blocksize', 'Multiple patterning N', 'Multiple patterning i', 'Layer number', 'WRV Block unit/NWA px size', 'Exec string'};
             
         ceCustomMaskOptions = { 'None', ...
                                 'Intel MET AIS Tripole', ...
@@ -94,6 +97,8 @@ classdef uizpgen < mic.Base
         uie4xNA
         uitD
         uitDLabel
+        uitTrueDr
+        uitTrueDrLabel
         uieEp
         uieDr
         uieZernikes
@@ -129,6 +134,9 @@ classdef uizpgen < mic.Base
         
         uieExecStr
         uicbComputeExternally
+        uicbCompressFiles
+        
+        
         uibOpenInFinder
         
         uicbRandomizeWRVZones
@@ -147,6 +155,8 @@ classdef uizpgen < mic.Base
         
         cZPGenDir = fullfile(fileparts(mfilename('fullpath')), '..');
         cOutputFileDir = '';
+        
+        bPreserveUncompressedFiles = false
     end
     
     properties (SetAccess = private)
@@ -181,12 +191,15 @@ classdef uizpgen < mic.Base
 
             this.uieObscurationSigma    = mic.ui.common.Edit('cLabel', 'Obscuration Sigma', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieNA                  = mic.ui.common.Edit('cLabel', 'NA', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
-            this.uie4xNA                  = mic.ui.common.Edit('cLabel', '4xNA', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
-            this.uitDLabel               = mic.ui.common.Text('cType', 'd', 'cVal', 'D (um)');
+            this.uie4xNA                = mic.ui.common.Edit('cLabel', '4xNA', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            this.uitDLabel              = mic.ui.common.Text('cType', 'd', 'cVal', 'D (um)');
             this.uitD                   = mic.ui.common.Text( 'cVal', '100', 'dFontSize', 14, 'cFontWeight', 'bold');
+            this.uitTrueDrLabel         = mic.ui.common.Text('cType', 'd', 'cVal', 'True dr (nm)');
+            this.uitTrueDr              = mic.ui.common.Text( 'cVal', '100', 'dFontSize', 14, 'cFontWeight', 'bold');
+
             
             this.uieEp                  = mic.ui.common.Edit('cLabel', 'Pht Energy (eV)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
-            this.uieDr                  = mic.ui.common.Edit('cLabel', 'dr (nm)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            this.uieDr                  = mic.ui.common.Edit('cLabel', 'dr (nm, On-Ax)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
 
             
             this.uieAnamorphicFac       = mic.ui.common.Edit('cLabel', 'Anamorphic factor', 'cType', 'd', 'fhDirectCallback', @this.cb);
@@ -240,7 +253,8 @@ classdef uizpgen < mic.Base
             this.uicbCurl               = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Curl progress', 'fhDirectCallback', @this.cb);
             
             this.uicbComputeExternally  = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Compute Externally', 'fhDirectCallback', @this.cb);
-            
+            this.uicbCompressFiles  = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Compress ZP with Log', 'fhDirectCallback', @this.cb);
+
             
             this.uicbRandomizeWRVZones  = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Randomize WRV Zones', 'fhDirectCallback', @this.cb);
             
@@ -269,6 +283,7 @@ classdef uizpgen < mic.Base
 
             this.uieLambda.set(13.5);
             this.uieNA.set(0.08);
+            this.cb(this.uieNA);
 
             this.uieEp.set(this.hc/13.5);
             this.uieP.set(500);
@@ -361,6 +376,8 @@ classdef uizpgen < mic.Base
                         this.uicbReverseTone.set(varargin{k+1})
                     case 'blockUnit'
                         this.uieWRVBlockUnit.set(varargin{k+1})
+                    case 'compress'
+                        this.uicbCompressFiles.set(varargin{k+1});
                 end
             end
                 
@@ -369,12 +386,23 @@ classdef uizpgen < mic.Base
         function D = getD(this)
             cra = this.uieCraAngle.get();
             p = this.uieP.get();
+            q = this.uieQ.get();
+            
+            pqmin = min(p,q);
             na = this.uieNA.get();
             naL = sind(cra) - na;
             naH = sind(cra) + na;
             
-            D = p*(tan(asin(naH)) - tan(asin(naL)));
+            D = pqmin*(tan(asin(naH)) - tan(asin(naL)));
 
+        end
+        
+        function dr = getTrueDr(this)
+            cra = this.uieCraAngle.get();
+            na = this.uieNA.get();
+            naP = sind(cra) + na;
+            dr = this.uieLambda.get()/naP/2;
+            
         end
      
         function cb(this, src, dat)
@@ -384,7 +412,10 @@ classdef uizpgen < mic.Base
                     
                 case this.uieCraAngle
                     this.uitD.set(sprintf('%0.2f', this.getD()));
+                    this.uitTrueDr.set(sprintf('%0.3f', this.getTrueDr()));
                 case this.uieP
+                    this.uitD.set(sprintf('%0.2f', this.getD()));
+                case this.uieQ
                     this.uitD.set(sprintf('%0.2f', this.getD()));
                 case this.uieNA
                     this.uie4xNA.setWithoutNotify(this.uieNA.get()*4)
@@ -393,6 +424,7 @@ classdef uizpgen < mic.Base
                     
                     
                     this.uitD.set(sprintf('%0.2f', this.getD()));
+                    this.uitTrueDr.set(sprintf('%0.3f', this.getTrueDr()));
                 case this.uie4xNA
                     this.uieNA.setWithoutNotify(this.uie4xNA.get()/4)
                     setVal = this.uieLambda.get()/this.uieNA.get()/2;
@@ -422,6 +454,9 @@ classdef uizpgen < mic.Base
                     setVal = this.hc/this.uieLambda.get();
                     this.uieEp.setWithoutNotify(setVal)
                     
+                    this.uitTrueDr.set(sprintf('%0.3f', this.getTrueDr()));
+                    this.uitD.set(sprintf('%0.2f', this.getD()));
+                    
                     this.cb(this.uieNA);
                 case this.uibLoad
                     this.load();
@@ -435,9 +470,9 @@ classdef uizpgen < mic.Base
                 
                 case this.uibOpenInFinder
                     if strcmp(this.arch, 'win64')
-                        system(sprintf('explorer %s', fullfile(this.cDirThis, '..', 'ZPFiles')));
+                        system(sprintf('explorer %s', fullfile(this.cOutputFileDir)));
                     else
-                        system(sprintf('open %s', fullfile(this.cDirThis, '..', 'ZPFiles')));
+                        system(sprintf('open %s', fullfile(this.cOutputFileDir)));
 
                     end
                 case this.uipFileOutput 
@@ -465,10 +500,10 @@ classdef uizpgen < mic.Base
             end
         end
         
-        function stageAndGenerate(this)
+        function zpFilePath = stageAndGenerate(this)
             this.stageZP();
             drawnow;
-            this.generate();
+            zpFilePath = this.generate();
         end
         
         function build(this)
@@ -505,7 +540,8 @@ classdef uizpgen < mic.Base
             this.uibOpenInFinder.build(this.hFigure, dCol5 + 20, dYWid*2 + 10, 100, 40);
 
             this.uipFileOutput.build(this.hFigure, dCol1, 2*dYWid, 200, 30);
-            this.uicbComputeExternally.build(this.hFigure, dCol3 + 20, 2*dYWid + 10, 180, 30);
+            this.uicbCompressFiles.build(this.hFigure, dCol3 + 20, 2*dYWid + 10, 180, 30);
+            this.uicbComputeExternally.build(this.hFigure, dCol3 + 20, 2*dYWid + 33, 180, 30);
             
             this.uieZoneTol.build(this.hFigure, dCol1, 3*dYWid, 75, 30);
             this.uieZoneBias.build(this.hFigure, dCol2, 3*dYWid, 75, 30);
@@ -517,8 +553,12 @@ classdef uizpgen < mic.Base
             this.uie4xNA.build(this.hFigure, dCol2, 5*dYWid, 75, 30);
 
             this.uieDr.build(this.hFigure, dCol3, 5*dYWid, 75, 30);
-            this.uitDLabel.build(this.hFigure, dCol4, 5*dYWid, 75, 30);
-            this.uitD.build(this.hFigure, dCol4, 5*dYWid + 20, 75, 30);
+            
+            this.uitDLabel.build(this.hFigure, dCol5, 5*dYWid, 75, 30);
+            this.uitD.build(this.hFigure, dCol5, 5*dYWid + 20, 75, 30);
+            
+            this.uitTrueDrLabel.build(this.hFigure, dCol4, 5*dYWid, 75, 30);
+            this.uitTrueDr.build(this.hFigure, dCol4, 5*dYWid + 20, 75, 30);
 
             this.uieP.build(this.hFigure, dCol1, 6*dYWid, 75, 30);
             this.uieQ.build(this.hFigure, dCol2, 6*dYWid, 75, 30);
@@ -663,12 +703,10 @@ classdef uizpgen < mic.Base
         
 
         
-        function generate(this)
+        function sFilePath = generate(this)
+            tic
             
             cExecSt = this.uieExecStr.get();
-            
-        
-            
             
             if (this.uicbComputeExternally.get()) && this.uipFileOutput.getSelectedIndex() ~= uint8(4) % can't compute WRV externally if we need to run perl scripts
                 system([cExecSt, '&']);
@@ -678,14 +716,23 @@ classdef uizpgen < mic.Base
                 %fprintf('\nGeneration took %s\n', s2f(toc));
             end
             
-            % log item:
+            % log item to ZPLog:
             sFileName = fullfile(this.cZPGenDir, 'logs', sprintf('ZPLog_%s.csv', datestr(now, 29)));
-%             sFileName = sprintf('src/logs/ZPLog_%s.csv', datestr(now, 29));
             % check if file exists:
             if isempty(dir(sFileName)) % doesn't exist
                 zpgen.writeLog(sFileName, this.ceHeaders, true);
             end
-            zpgen.writeLog(sFileName, this.cLogStr);
+            zpgen.writeLog(sFileName, this.cLogStr, false, 'a');
+            
+            
+             % Create a single log in ZPFiles
+            sSingleLogFileName = fullfile(this.cOutputFileDir, sprintf('ZPLog_%s_%s.csv', this.uieZPName.get(), datestr(now, 29)));
+            % check if file exists:
+            zpgen.writeLog(sSingleLogFileName, this.ceHeaders, true, 'w');
+            zpgen.writeLog(sSingleLogFileName,  this.cLogStr, false, 'a');
+            
+            
+            
             
             if strcmp(this.arch, 'win64')
                 if ~isempty(dir('C:\Perl64\bin\perl.exe'))
@@ -733,6 +780,7 @@ classdef uizpgen < mic.Base
                 % Splitting into multiple fields:
                
                 if dNBlocks > 1
+                    
                     fprintf('Splitting WRV into fields...\n\n');
                     cExStr = sprintf('%s %s %s.wrv %d %d %s_multifield.wrv', ...
                         cPerlStr, ...
@@ -752,6 +800,8 @@ classdef uizpgen < mic.Base
                     system(cExStr);
                     fprintf('Exec perl command: \n\t%s\n\n', cExStr);
                     fprintf('Field splitting complete...\n\n');
+                    
+                    sFilePath = [sFilePath '_multifield'];
                 end
                 
             end
@@ -775,10 +825,40 @@ classdef uizpgen < mic.Base
                     system(cExStr);
                     fprintf('Exec perl command: \n\t%s\n\n', cExStr);
                     fprintf('Field splitting complete...\n\n');
+                    
+                    sFilePath = [sFilePath '_multifield'];
                 
             end
             
-            fprintf('Zone plate is finished\n');
+            
+            ext = '';
+            switch(this.uipFileOutput.getSelectedIndex())
+                case uint8(1)
+                    ext = '.nwa';
+                case uint8(2)
+                    ext = '.gds';
+                case uint8(4)
+                    ext = '.wrv';
+            end
+            
+            % Add extension:
+            sZipFileName = [sFilePath, '.zip'];
+            sFilePath = [sFilePath ext];
+            
+            % Zip file
+            if (this.uicbCompressFiles.get())
+                fprintf('Compressing file and log %s, %s\n', sFilePath, sSingleLogFileName);
+                zip(sZipFileName,{sFilePath, sSingleLogFileName});
+                
+                if (~this.bPreserveUncompressedFiles)
+                    delete(sFilePath);
+                end
+            end
+            
+            
+            fprintf('Zone plate %s finished in %s \n', sFilePath, s2f(toc));
+            
+           
             
         end
         

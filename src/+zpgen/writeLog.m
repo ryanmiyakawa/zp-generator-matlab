@@ -1,12 +1,14 @@
-function writeLog(logPath, elements, isHeader)
+function writeLog(logPath, elements, isHeader, fopenTag)
 nl = java.lang.System.getProperty('line.separator').char;
 
-if nargin == 2
+if nargin < 3
     isHeader = false;
 end
+if nargin < 4
+    fopenTag = 'a';
+end
 
-
-fid = fopen(logPath, 'a');
+fid = fopen(logPath, fopenTag);
 
 if isHeader
     str = 'Time stamp';
