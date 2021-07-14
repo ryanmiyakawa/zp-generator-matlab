@@ -35,3 +35,6 @@ foreach (@lines) {
 
 print "\nProcessed $ct lines\n";
 
+# Delete original non-randomized file:
+unlink($ARGV[0]);
+

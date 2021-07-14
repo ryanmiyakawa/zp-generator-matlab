@@ -359,6 +359,8 @@ classdef uizpgen < mic.Base
                         this.uipButtressIdx.setSelectedIndex(uint8(varargin{k+1}))
                     case 'reverseTone'
                         this.uicbReverseTone.set(varargin{k+1})
+                    case 'blockUnit'
+                        this.uieWRVBlockUnit.set(varargin{k+1})
                 end
             end
                 

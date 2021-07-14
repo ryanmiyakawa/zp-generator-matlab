@@ -102,3 +102,6 @@ if ($negCt > 0){
 
 
 print "\nProcessing of WRV file @ARGV[0] complete.  Processed clock speeds on $trapCt shapes.\n\n";
+
+# Delete original WRV file:
+unlink($ARGV[0]);
