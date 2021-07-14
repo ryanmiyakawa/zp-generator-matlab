@@ -7,6 +7,8 @@
 %
 % Changelog:
 %
+% 2.10.2: Resolving interaction between randomized and multifield
+%
 % 2.10.1: Adding ability to change WRV block unit size
 %
 % 2.10.0: Adding infinite conjugate, 4xNA and D (zone plate diameter)
@@ -42,7 +44,7 @@ classdef uizpgen < mic.Base
 
     
     properties (Constant)
-        cBuildName = 'ZPGen v2.10.1';
+        cBuildName = 'ZPGen v2.10.2';
         
         dWidth  = 1200;
         dHeight =  900;
@@ -722,6 +724,8 @@ classdef uizpgen < mic.Base
                     fprintf('Exec perl command: \n\t%s\n\n', cExStr);
                     system(cExStr);
                     fprintf('Zone randomization complete...\n\n');
+                    
+                    sFilePath = [sFilePath '_randomized'];
                 end
                 
                 % Splitting into multiple fields:
@@ -779,10 +783,10 @@ classdef uizpgen < mic.Base
         function stageZP(this)
             
             % Do some checks:
-            if this.uieNumBlocks.get() > 1 && this.uieBlockSize.get() > 800000
-                warndlg('WRV Blocksize must be 800,000 or less to prevent overrun.  Aborting stage');
-                return
-            end
+%             if this.uieNumBlocks.get() > 1 && this.uieBlockSize.get() > 800000
+%                 warndlg('WRV Blocksize must be 800,000 or less to prevent overrun.  Aborting stage');
+%                 return
+%             end
             
             if strcmp(this.arch, 'win64')
                 sPrefix = [cd '\src\bin\ZPGen.exe '];
