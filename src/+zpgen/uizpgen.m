@@ -317,7 +317,7 @@ classdef uizpgen < mic.Base
             this.uieDoseBiasScaling.set(1);
             this.uieBlockSize.set(8e5);
             this.uieNumBlocks.set(1);
-            this.uieBlockGrid.set(-1);
+            this.uieBlockGrid.set(0);
             this.uieMultiplePatN.set(1);
             this.uieMultiplePatIdx.set(1);
             this.uieLayerNumber.set(1);
