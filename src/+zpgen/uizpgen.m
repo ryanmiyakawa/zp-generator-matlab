@@ -7,6 +7,8 @@
 %
 % Changelog:
 %
+% 2.12.0: Adding ability for WRV to round block number
+%
 % 2.11.0: Adding ability to compress files, logs all zps locally, removes
 % intermediate files
 %
@@ -47,7 +49,7 @@ classdef uizpgen < mic.Base
 
     
     properties (Constant)
-        cBuildName = 'ZPGen v2.11.0';
+        cBuildName = 'ZPGen v2.12.0';
         
         dWidth  = 1200;
         dHeight =  900;
@@ -120,6 +122,7 @@ classdef uizpgen < mic.Base
         uieDoseBiasScaling
         uieBlockSize
         uieNumBlocks
+        uieBlockGrid
         uieMultiplePatN
         uieMultiplePatIdx
         uieLayerNumber
@@ -241,7 +244,8 @@ classdef uizpgen < mic.Base
             
             this.uieDoseBiasScaling     = mic.ui.common.Edit('cLabel', 'Dose Bias Scaling', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieBlockSize           = mic.ui.common.Edit('cLabel', 'WRV Block N px', 'cType', 'd', 'fhDirectCallback', @this.cb);
-            this.uieNumBlocks           = mic.ui.common.Edit('cLabel', 'Block N^2 (odd sq.)', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            this.uieBlockGrid           = mic.ui.common.Edit('cLabel', 'Block grid (pm)', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            this.uieNumBlocks           = mic.ui.common.Edit('cLabel', 'Block (2N + 1)^2', 'cType', 'd', 'fhDirectCallback', @this.cb);
             
             this.uieWRVBlockUnit        = mic.ui.common.Edit('cLabel', 'Block unit (pm))', 'cType', 'd', 'fhDirectCallback', @this.cb);
             
@@ -313,6 +317,7 @@ classdef uizpgen < mic.Base
             this.uieDoseBiasScaling.set(1);
             this.uieBlockSize.set(8e5);
             this.uieNumBlocks.set(1);
+            this.uieBlockGrid.set(-1);
             this.uieMultiplePatN.set(1);
             this.uieMultiplePatIdx.set(1);
             this.uieLayerNumber.set(1);
@@ -594,7 +599,8 @@ classdef uizpgen < mic.Base
 %             this.uieMultiplePatN.build(this.hFigure, dCol2, 15*dYWid, 75, 30);
 %             this.uieMultiplePatIdx.build(this.hFigure, dCol3, 15*dYWid, 75, 30);
             this.uieBlockSize.build(this.hFigure, dCol1, 15*dYWid, 80, 30);
-            this.uieNumBlocks.build(this.hFigure, dCol2, 15*dYWid, 120, 30);
+            this.uieNumBlocks.build(this.hFigure, dCol2, 15*dYWid, 80, 30);
+            this.uieBlockGrid.build(this.hFigure, dCol3, 15*dYWid, 80, 30);
             this.uieWRVBlockUnit.build(this.hFigure, dCol4, 15*dYWid, 80, 30);
             this.uicbRandomizeWRVZones.build(this.hFigure, dCol5, 15*dYWid + 10, 150, 30);
             this.uicbCenterOffaxisZP.build(this.hFigure, dCol5, 16*dYWid -5, 115, 30);
@@ -948,6 +954,8 @@ classdef uizpgen < mic.Base
             sParams = [sParams sprintf(' %d ', round(this.uieMultiplePatN.get()))];
             % Multiple patterning, index of parts
             sParams = [sParams sprintf(' %d ', round(this.uieMultiplePatIdx.get()))];
+            % WRV Block grid
+            sParams = [sParams sprintf(' %d ', round(this.uieBlockGrid.get()))];
             
             % Layer number OR num blocks on side
             if this.uipFileOutput.getSelectedIndex() == uint8(4)
