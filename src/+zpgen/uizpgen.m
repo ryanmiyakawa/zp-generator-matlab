@@ -7,6 +7,8 @@
 %
 % Changelog:
 %
+% 2.13.0: Fixing non-circular zone jog issue
+%
 % 2.12.0: Adding ability for WRV to round block number
 %
 % 2.11.0: Adding ability to compress files, logs all zps locally, removes
@@ -49,7 +51,7 @@ classdef uizpgen < mic.Base
 
     
     properties (Constant)
-        cBuildName = 'ZPGen v2.12.0';
+        cBuildName = 'ZPGen v2.13.0';
         
         dWidth  = 1200;
         dHeight =  900;
