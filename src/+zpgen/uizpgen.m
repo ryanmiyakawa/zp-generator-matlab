@@ -7,6 +7,13 @@
 %
 % Changelog:
 %
+% 2.15.0: Forcing zone aberration min shape tolerance to be a multiple of
+% buttress shape
+%
+% 2.14.0: Dose now calculated based on true area fraction rather than bias
+% in WRV files, useful when the files are rounded to pixels in ways that
+% contribute significantly to area fraction
+%
 % 2.13.0: Fixing non-circular zone jog issue
 %
 % 2.12.0: Adding ability for WRV to round block number
@@ -51,7 +58,7 @@ classdef uizpgen < mic.Base
 
     
     properties (Constant)
-        cBuildName = 'ZPGen v2.13.0';
+        cBuildName = 'ZPGen v2.15.0';
         
         dWidth  = 1200;
         dHeight =  900;
