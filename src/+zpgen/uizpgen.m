@@ -963,10 +963,11 @@ classdef uizpgen < mic.Base
             sParams = [sParams sprintf(' %d ', round(this.uieMultiplePatN.get()))];
             % Multiple patterning, index of parts
             sParams = [sParams sprintf(' %d ', round(this.uieMultiplePatIdx.get()))];
-            % WRV Block grid
+            
+            % WRV Block grid (shapes will round to the grid specified here)
             sParams = [sParams sprintf(' %d ', round(this.uieBlockGrid.get()))];
             
-            % Layer number OR num blocks on side
+            % Layer number OR num blocks on side (WRV multifield)
             if this.uipFileOutput.getSelectedIndex() == uint8(4)
                 dVal = round(sqrt(this.uieNumBlocks.get()));
             else
