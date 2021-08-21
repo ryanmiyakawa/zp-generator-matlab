@@ -50,6 +50,12 @@ while 1
     end
     
     switch method
+        case 'text'
+            if (mod(idx, 3) == 0)
+                zpgen.patchTrapLineText(tline);
+            else
+                zpgen.patchTrapLine(tline);
+            end
         case 'patch'
             zpgen.patchTrapLine(tline);   
         case 'plot'
