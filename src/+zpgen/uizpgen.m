@@ -6,6 +6,7 @@
 % accommodate different setups
 %
 % Changelog:
+% 2.16.1: Adding new obscurations
 %
 % 2.16.0: Adding GTX support
 %
@@ -60,7 +61,7 @@ classdef uizpgen < mic.Base
 
     
     properties (Constant)
-        cBuildName = 'ZPGen v2.15.0';
+        cBuildName = 'ZPGen v2.16.1';
         
         dWidth  = 1200;
         dHeight =  900;
@@ -89,7 +90,7 @@ classdef uizpgen < mic.Base
                                 'Black ring 0.95', ...
                                 'Obscuration Only', ...
                                 'Sliver', ...
-                                'KLA Circular obscuration'};
+                                'KTobs'};
     end
     
     properties
