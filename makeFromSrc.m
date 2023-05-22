@@ -1,0 +1,1 @@
+!gcc /Users/rhmiyakawa/Documents/Xcode/zpgen/ZPGen/ZPGen/ZPGen/src/zpGenPlus.cpp -o src/bin/ZPGen

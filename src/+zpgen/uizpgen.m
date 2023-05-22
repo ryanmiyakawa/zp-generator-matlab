@@ -7,6 +7,8 @@
 %
 % Changelog:
 %
+% 2.16.0: Adding GTX support
+%
 % 2.15.0: Forcing zone aberration min shape tolerance to be a multiple of
 % buttress shape
 %
@@ -86,7 +88,8 @@ classdef uizpgen < mic.Base
                                 'Spiral phase', ...
                                 'Black ring 0.95', ...
                                 'Obscuration Only', ...
-                                'Sliver'};
+                                'Sliver', ...
+                                'KLA Circular obscuration'};
     end
     
     properties
@@ -144,6 +147,7 @@ classdef uizpgen < mic.Base
         
         uieAnamorphicFac
         uicbCenterOffaxisZP
+        uicbOffsetTiltedZP
         
         uieExecStr
         uicbComputeExternally
@@ -235,7 +239,7 @@ classdef uizpgen < mic.Base
             this.uipNWAPxSize           = mic.ui.common.Popup('cLabel', 'NWA px size', 'ceOptions', {'N/A', '1.75 nm', '2 nm', '2.5 nm', '4 nm', '5 nm', '6 nm', '7 nm', '8 nm'}, ...
                                                                 'fhDirectCallback', @this.cb);
                                                             
-            this.uipFileOutput          = mic.ui.common.Popup('cLabel', 'Output file type', 'ceOptions', {'NWA (ARC)', 'GDS', 'GDS + txt', 'WRV'}, ...
+            this.uipFileOutput          = mic.ui.common.Popup('cLabel', 'Output file type', 'ceOptions', {'NWA (ARC)', 'GDS', 'GDS + txt', 'WRV', 'GTX'}, ...
                                                                 'fhDirectCallback', @this.cb);
                                                                                  
                                                             
@@ -274,8 +278,8 @@ classdef uizpgen < mic.Base
             
             
             this.uicbCenterOffaxisZP    = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Center Off-axis ZP', 'fhDirectCallback', @this.cb);
-            
-            
+            this.uicbOffsetTiltedZP    = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Offset tilted ZP', 'fhDirectCallback', @this.cb);
+
             this.uibStageAndGenerate    = mic.ui.common.Button('cText', 'Stage and Generate', 'fhDirectCallback', @this.cb);
             
             this.uibStageZP             = mic.ui.common.Button('cText', 'Stage ZP', 'fhDirectCallback', @this.cb);
@@ -333,6 +337,7 @@ classdef uizpgen < mic.Base
             this.uieLayerNumber.set(1);
                 
             this.uicbCenterOffaxisZP.set(true);
+            this.uicbOffsetTiltedZP.set(false);
             this.uicbInfiniteConjugate.set(false);
             
             
@@ -383,6 +388,8 @@ classdef uizpgen < mic.Base
                         this.uipFileOutput.setSelectedIndex(uint8(varargin{k+1}))
                     case 'centerZP'
                         this.uicbCenterOffaxisZP.set(varargin{k+1});
+                    case 'ofsetTilted'
+                        this.uicbOffsetTiltedZP.set(varargin{k+1});
                     case 'randomizeZones'
                         this.uicbRandomizeWRVZones.set(varargin{k+1});
                     case 'buttressing'
@@ -614,6 +621,7 @@ classdef uizpgen < mic.Base
             this.uieWRVBlockUnit.build(this.hFigure, dCol4, 15*dYWid, 80, 30);
             this.uicbRandomizeWRVZones.build(this.hFigure, dCol5, 15*dYWid + 10, 150, 30);
             this.uicbCenterOffaxisZP.build(this.hFigure, dCol5, 16*dYWid -5, 115, 30);
+            this.uicbOffsetTiltedZP.build(this.hFigure, dCol5, 17*dYWid -5, 115, 30);
 
             
             this.uieLayerNumber.build(this.hFigure, dCol1, 16*dYWid, 75, 30);
@@ -957,7 +965,13 @@ classdef uizpgen < mic.Base
             % Buttress T (period in dr)
             sParams = [sParams sprintf(' %0.4f ', this.uieButtressT.get())];
             % Center offaxis zone plate
-            sParams = [sParams sprintf(' %d ', this.uicbCenterOffaxisZP.get())];
+            if (this.uicbCenterOffaxisZP.get())
+                sParams = [sParams sprintf(' %d ', 1)];
+            elseif (this.uicbOffsetTiltedZP.get())
+                sParams = [sParams sprintf(' %d ', 2)];
+            else
+                sParams = [sParams sprintf(' %d ', 0)];
+            end
             % Blocksize [1e6]
             sParams = [sParams sprintf(' %d ', this.uieBlockSize.get())];
             % Multiple patterning, number of parts
@@ -978,7 +992,7 @@ classdef uizpgen < mic.Base
             
             
             % NWA pixel size or WRV pixel size 
-            if this.uipFileOutput.getSelectedIndex() == uint8(4)
+            if this.uipFileOutput.getSelectedIndex() == uint8(4) || this.uipFileOutput.getSelectedIndex() == uint8(5)
                 sParams = [sParams sprintf(' %d ', this.uieWRVBlockUnit.get())];
             else
                 sParams = [sParams sprintf(' %d ', this.uipNWAPxSize.getSelectedIndex() - 1)];

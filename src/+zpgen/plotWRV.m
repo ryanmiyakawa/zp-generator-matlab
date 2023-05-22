@@ -1,4 +1,4 @@
-function plotWRV(skip, method)
+function plotWRV(skip, method, color)
 
 if nargin < 1
     skip = 1;
@@ -8,6 +8,12 @@ if nargin < 2
     method = 'patch';
 end
 
+if nargin < 3
+    color = 'g';
+end
+
+
+textMod = 1;
 
 
 [d, p] = uigetfile('*.wrv*');
@@ -51,8 +57,8 @@ while 1
     
     switch method
         case 'text'
-            if (mod(idx, 3) == 0)
-                zpgen.patchTrapLineText(tline);
+            if (mod(idx, textMod) == 0)
+                zpgen.patchTrapLineText(tline, color);
             else
                 zpgen.patchTrapLine(tline);
             end
