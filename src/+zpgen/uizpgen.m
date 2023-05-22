@@ -172,7 +172,7 @@ classdef uizpgen < mic.Base
         arch = computer('arch')
         
         cZPGenDir = fullfile(fileparts(mfilename('fullpath')), '..');
-        cOutputFileDir = '';
+        cOutputFileDir = fullfile(fileparts(mfilename('fullpath')), '..');
         
         bPreserveUncompressedFiles = false
     end
@@ -751,7 +751,7 @@ classdef uizpgen < mic.Base
             
             
              % Create a single log in ZPFiles
-            sSingleLogFileName = fullfile(this.cOutputFileDir, 'logs', sprintf('ZPLog_%s_%s.csv', this.uieZPName.get(), datestr(now, 29)));
+            sSingleLogFileName = fullfile(this.cOutputFileDir, 'ZPFiles', sprintf('ZPLog_%s_%s.csv', this.uieZPName.get(), datestr(now, 29)));
             % check if file exists:
             zpgen.writeLog(sSingleLogFileName, this.ceHeaders, true, 'w');
             zpgen.writeLog(sSingleLogFileName,  this.cLogStr, false, 'a');
@@ -780,7 +780,7 @@ classdef uizpgen < mic.Base
             if isempty(this.cOutputFileDir)
                 sFilePath = fullfile(this.cZPGenDir, 'ZPFiles', regexprep(this.uieZPName.get(), '\s', '_'));
             else
-                sFilePath = fullfile(this.cOutputFileDir, regexprep(this.uieZPName.get(), '\s', '_'));
+                sFilePath = fullfile(this.cOutputFileDir, 'ZPFiles', regexprep(this.uieZPName.get(), '\s', '_'));
             end
             
             
@@ -904,7 +904,7 @@ classdef uizpgen < mic.Base
                 if isempty(this.cOutputFileDir)
                     sFilePath = fullfile(this.cZPGenDir, 'ZPFiles', regexprep(this.uieZPName.get(), '\s', '_'));
                 else
-                    sFilePath = fullfile(this.cOutputFileDir, regexprep(this.uieZPName.get(), '\s', '_'));
+                    sFilePath = fullfile(this.cOutputFileDir, 'ZPFiles', regexprep(this.uieZPName.get(), '\s', '_'));
                 end
                 
             end
