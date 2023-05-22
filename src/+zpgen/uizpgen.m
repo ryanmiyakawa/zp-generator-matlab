@@ -742,7 +742,7 @@ classdef uizpgen < mic.Base
             end
             
             % log item to ZPLog:
-            sFileName = fullfile(this.cZPGenDir, 'logs', sprintf('ZPLog_%s.csv', datestr(now, 29)));
+            sFileName = fullfile(this.cOutputFileDir, 'logs', sprintf('ZPLog_%s.csv', datestr(now, 29)));
             % check if file exists:
             if isempty(dir(sFileName)) % doesn't exist
                 zpgen.writeLog(sFileName, this.ceHeaders, true);
@@ -751,7 +751,7 @@ classdef uizpgen < mic.Base
             
             
              % Create a single log in ZPFiles
-            sSingleLogFileName = fullfile(this.cOutputFileDir, sprintf('ZPLog_%s_%s.csv', this.uieZPName.get(), datestr(now, 29)));
+            sSingleLogFileName = fullfile(this.cOutputFileDir, 'logs', sprintf('ZPLog_%s_%s.csv', this.uieZPName.get(), datestr(now, 29)));
             % check if file exists:
             zpgen.writeLog(sSingleLogFileName, this.ceHeaders, true, 'w');
             zpgen.writeLog(sSingleLogFileName,  this.cLogStr, false, 'a');
