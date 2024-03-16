@@ -6,6 +6,9 @@
 % accommodate different setups
 %
 % Changelog:
+%
+% 3.0.0: Migrating to new Hologen ZP framework
+%
 % 2.16.1: Adding new obscurations
 %
 % 2.16.0: Adding GTX support
@@ -32,7 +35,7 @@
 %
 % 2.9.2: Adding dr and photon energy
 %
-% 2.9.1: Fixing bug with aperture boundaries 
+% 2.9.1: Fixing bug with aperture boundaries
 %
 % 2.9.0: Refactoring pupil coordinate computation and allowing for filled
 % obscurations
@@ -53,44 +56,72 @@
 % 2.4: added NWA support and support for centering of off-axis zone plates.
 % Also added support for central obscurations for anamorphic zone plates
 % and a new custom square aperture as per Ken's request.
-% 
+%
 %
 %
 
 classdef uizpgen < mic.Base
-
+    
     
     properties (Constant)
-        cBuildName = 'ZPGen v2.16.1';
+        cBuildName = 'ZPGen v3.0.0';
         
-        dWidth  = 1200;
-        dHeight =  900;
+        dWidth  = 1500;
+        dHeight =  800;
         hc      = 1240.71
-        ceHeaders = {'File name', 'Build version', 'Zone tolerance', 'lambda (nm)', 'P (um)', 'Q (um)', 'Obscuration sigma', 'NA', 'Zernikes', ...
-                'Custom mask index', 'ZP tilt (deg)', 'Azimuthal (deg)', 'CRA (deg)', 'Anamorphic fac', ...
-                'ZPC phase (deg)', 'ZPC apodization', 'Ap function', 'ZPC inner rad', 'ZPC outer rad', 'Zone bias (nm)', ...
-                'File format', 'Tone reversal', 'Buttressing', 'Buttress width', 'Buttress period', 'Off-axis centering', ...
-                'WRV blocksize', 'Multiple patterning N', 'Multiple patterning i', 'Layer number', 'WRV Block unit/NWA px size', 'Exec string'};
-            
+        ceHeaders = {   'File name', ...
+            'Build version', ...
+            'Zone tolerance',...
+            'lambda (nm)',...
+            'P (um)',...
+            'Q (um)',...
+            'K-vec',...
+            'Beta-1', ...
+            'Beta-2', ...
+            'Obscuration sigma',...
+            'NA',...
+            'Zernikes', ...
+            'Custom mask index',...
+            'Anamorphic fac', ...
+            'ZPC phase (deg)',...
+            'ZPC apodization',...
+            'Ap function',...
+            'ZPC inner rad',...
+            'ZPC outer rad',...
+            'Zone bias (nm)', ...
+            'File format',...
+            'Tone reversal',...
+            'Buttressing',...
+            'Buttress width',...
+            'Buttress period',...
+            'Off-axis centering', ...
+            'WRV blocksize',...
+            'Multiple patterning N',...
+            'Multiple patterning i',...
+            'Layer number',...
+            'WRV Block unit/NWA px size',...
+            'Exec string'...
+            };
+        
         ceCustomMaskOptions = { 'None', ...
-                                'Intel MET AIS Tripole', ...
-                                'TDS Config ZP2', ...
-                                'TDS Config ZP3', ...
-                                'TDS Config ZP4', ...
-                                '5-Square', ...
-                                '5-Square 45', ...
-                                'Flip align', ... 
-                                'Octopole', ...
-                                'Concentric rings', ...
-                                'Octal Rays', ...
-                                'Square', ...
-                                'Horizontal Strip', ...
-                                'Vertical Strip', ...
-                                'Spiral phase', ...
-                                'Black ring 0.95', ...
-                                'Obscuration Only', ...
-                                'Sliver', ...
-                                'KTobs'};
+            'Intel MET AIS Tripole', ...
+            'TDS Config ZP2', ...
+            'TDS Config ZP3', ...
+            'TDS Config ZP4', ...
+            '5-Square', ...
+            '5-Square 45', ...
+            'Flip align', ...
+            'Octopole', ...
+            'Concentric rings', ...
+            'Octal Rays', ...
+            'Square', ...
+            'Horizontal Strip', ...
+            'Vertical Strip', ...
+            'Spiral phase', ...
+            'Black ring 0.95', ...
+            'Obscuration Only', ...
+            'Sliver', ...
+            'KTobs'};
     end
     
     properties
@@ -102,6 +133,9 @@ classdef uizpgen < mic.Base
         
         uiZPPropagator
         
+        hLines = {}
+        hPatches = {}
+        
         cDirThis
         
         uieZoneTol
@@ -111,10 +145,30 @@ classdef uizpgen < mic.Base
         uieObscurationSigma
         uieNA
         uie4xNA
+        
         uitD
         uitDLabel
         uitTrueDr
         uitTrueDrLabel
+        uitNz
+        uitNzLabel
+        
+        uiePhat
+        uieKhat
+        uieBeta1hat
+        uieBeta2hat
+        uiePNorm
+        
+        uiePAzi
+        uieKAzi
+        uieBetaAzi
+        
+        
+        uiePAngle
+        uieKAngle
+        uieBeta1Angle
+        uieBeta2Angle
+        
         uieEp
         uieDr
         uieZernikes
@@ -144,6 +198,11 @@ classdef uizpgen < mic.Base
         uipCustomMask
         uipNWAPxSize
         
+        hUIPanelFile
+        hUIPanelOptical
+        hUIPanelPattern
+        hUIPanelExecute
+        
         uieWRVBlockUnit
         
         uieAnamorphicFac
@@ -159,13 +218,19 @@ classdef uizpgen < mic.Base
         
         uicbRandomizeWRVZones
         uicbInfiniteConjugate
-
+        
         uibStageAndGenerate
         uibGenerate
         uibStageZP
         uibSave
         uibLoad
         uieZPName
+        
+        haGeom
+        haXZ
+        haYZ
+        haPupil
+        
         
         cExecStr = []
         cLogStr = ''
@@ -197,16 +262,16 @@ classdef uizpgen < mic.Base
         
         function init(this)
             [this.cDirThis, cName, cExt] = fileparts(mfilename('fullpath'));
-           
+            
             this.uiZPPropagator         = GDS.ui.GDS_Propagation;
-
+            
             this.uieZoneTol             = mic.ui.common.Edit('cLabel', 'Zone Tol', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieLambda              = mic.ui.common.Edit('cLabel', 'Lambda (nm)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
             
             this.uieP                   = mic.ui.common.Edit('cLabel', 'p (um)', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieQ                   = mic.ui.common.Edit('cLabel', 'q (um)', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uicbInfiniteConjugate  = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Infinite conjugate', 'fhDirectCallback', @this.cb);
-
+            
             this.uieObscurationSigma    = mic.ui.common.Edit('cLabel', 'Obscuration Sigma', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieNA                  = mic.ui.common.Edit('cLabel', 'NA', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
             this.uie4xNA                = mic.ui.common.Edit('cLabel', '4xNA', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
@@ -214,16 +279,34 @@ classdef uizpgen < mic.Base
             this.uitD                   = mic.ui.common.Text( 'cVal', '100', 'dFontSize', 14, 'cFontWeight', 'bold');
             this.uitTrueDrLabel         = mic.ui.common.Text('cType', 'd', 'cVal', 'True dr (nm)');
             this.uitTrueDr              = mic.ui.common.Text( 'cVal', '100', 'dFontSize', 14, 'cFontWeight', 'bold');
-
-            
+            this.uitNz                  = mic.ui.common.Text( 'cVal', '100', 'dFontSize', 14, 'cFontWeight', 'bold');
+            this.uitNzLabel             = mic.ui.common.Text('cType', 'd', 'cVal', 'N Zones (parent)');
             this.uieEp                  = mic.ui.common.Edit('cLabel', 'Pht Energy (eV)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
             this.uieDr                  = mic.ui.common.Edit('cLabel', 'dr (nm, On-Ax)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
-
             
-            this.uieAnamorphicFac       = mic.ui.common.Edit('cLabel', 'Anamorphic factor', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            
+            this.uieAnamorphicFac       = mic.ui.common.Edit('cLabel', 'Ana. fac.', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieZernikes            = mic.ui.common.Edit('cLabel', 'Zernike string', 'cType', 'c', 'fhDirectCallback', @this.cb);
             this.uieAlpha               = mic.ui.common.Edit('cLabel', 'Alpha', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieZPTilt              = mic.ui.common.Edit('cLabel', 'Tilt (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            
+            %direction cosines vectors:
+            this.uiePhat                = mic.ui.common.Edit('cLabel', 'p-hat (Optical Axis)', 'cType', 'c', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            this.uieKhat                = mic.ui.common.Edit('cLabel', 'k-hat (CRA)', 'cType', 'c', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            this.uieBeta1hat            = mic.ui.common.Edit('cLabel', 'Beta 1 (ZP Basis 1)', 'cType', 'c', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            this.uieBeta2hat            = mic.ui.common.Edit('cLabel', 'Beta 2 (ZP Basis 2)', 'cType', 'c', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            
+            this.uiePAngle              = mic.ui.common.Edit('cLabel', 'p-tilt  (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            this.uiePNorm              = mic.ui.common.Edit('cLabel', 'p-norm (um)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            
+            this.uieKAngle              = mic.ui.common.Edit('cLabel', 'k-tilt (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            this.uieBeta1Angle           = mic.ui.common.Edit('cLabel', 'Beta 1 tilt (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            this.uieBeta2Angle           = mic.ui.common.Edit('cLabel', 'Beta 2 tilt (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            
+            
+            this.uiePAzi                = mic.ui.common.Edit('cLabel', 'p-azi (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            this.uieKAzi                = mic.ui.common.Edit('cLabel', 'k-azi (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
+            this.uieBetaAzi             = mic.ui.common.Edit('cLabel', 'beta-azi (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb, 'lNotifyOnProgrammaticSet', false);
             
             this.uieCraAz               = mic.ui.common.Edit('cLabel', 'CRA Az (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieCraAngle            = mic.ui.common.Edit('cLabel', 'CRA (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb);
@@ -231,28 +314,28 @@ classdef uizpgen < mic.Base
             this.uieApodMag             = mic.ui.common.Edit('cLabel', 'Apodization Mag', 'cType', 'd', 'fhDirectCallback', @this.cb);
             
             this.uipApodFn              = mic.ui.common.Popup('cLabel', 'Apodization fn', 'ceOptions', {'None', 'Hamming', 'Gaussian'}, ...
-                                                                'fhDirectCallback', @this.cb);
+                'fhDirectCallback', @this.cb);
             
             this.uieZPCR1               = mic.ui.common.Edit('cLabel', 'ZPC R1 (sigma)', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieZPCR2               = mic.ui.common.Edit('cLabel', 'ZPC R2 (sigma)', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieZoneBias            = mic.ui.common.Edit('cLabel', 'Zone Bias (nm)', 'cType', 'd', 'fhDirectCallback', @this.cb);
             
             this.uipNWAPxSize           = mic.ui.common.Popup('cLabel', 'NWA px size', 'ceOptions', {'N/A', '1.75 nm', '2 nm', '2.5 nm', '4 nm', '5 nm', '6 nm', '7 nm', '8 nm'}, ...
-                                                                'fhDirectCallback', @this.cb);
-                                                            
+                'fhDirectCallback', @this.cb);
+            
             this.uipFileOutput          = mic.ui.common.Popup('cLabel', 'Output file type', 'ceOptions', {'NWA (ARC)', 'GDS', 'GDS + txt', 'WRV', 'GTX'}, ...
-                                                                'fhDirectCallback', @this.cb);
-                                                                                 
-                                                            
+                'fhDirectCallback', @this.cb);
+            
+            
             this.uipCustomMask          = mic.ui.common.Popup('cLabel', 'Custom mask', 'ceOptions',this.ceCustomMaskOptions, ...
-                                                                'fhDirectCallback', @this.cb);
-                                                            
-                                                        
+                'fhDirectCallback', @this.cb);
+            
+            
             this.uicbReverseTone        = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Reverse Tone', 'fhDirectCallback', @this.cb);
             
             this.uipButtressIdx         = mic.ui.common.Popup('cLabel', 'Buttressing', 'ceOptions', {'None', 'Gapped zones (PT)', 'Zones + gaps (NT)'}, ...
-                                                                'fhDirectCallback', @this.cb);
-                                                            
+                'fhDirectCallback', @this.cb);
+            
             
             this.uieButtressW           = mic.ui.common.Edit('cLabel', 'Buttress width param', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieButtressT           = mic.ui.common.Edit('cLabel', 'Buttress period param', 'cType', 'd', 'fhDirectCallback', @this.cb);
@@ -273,14 +356,14 @@ classdef uizpgen < mic.Base
             
             this.uicbComputeExternally  = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Compute Externally', 'fhDirectCallback', @this.cb);
             this.uicbCompressFiles  = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Compress ZP with Log', 'fhDirectCallback', @this.cb);
-
+            
             
             this.uicbRandomizeWRVZones  = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Randomize WRV Zones', 'fhDirectCallback', @this.cb);
             
             
             this.uicbCenterOffaxisZP    = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Center Off-axis ZP', 'fhDirectCallback', @this.cb);
             this.uicbOffsetTiltedZP    = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Offset tilted ZP', 'fhDirectCallback', @this.cb);
-
+            
             this.uibStageAndGenerate    = mic.ui.common.Button('cText', 'Stage and Generate', 'fhDirectCallback', @this.cb);
             
             this.uibStageZP             = mic.ui.common.Button('cText', 'Stage ZP', 'fhDirectCallback', @this.cb);
@@ -293,22 +376,35 @@ classdef uizpgen < mic.Base
             
             this.uieExecStr             = mic.ui.common.Edit('cLabel', 'Exec string', 'cType', 'c', 'fhDirectCallback', @this.cb);
             
+            this.uieZernikes.set('[]');
+            this.uiePhat.set('[0, 0, 1]');
+            this.uieKhat.set('[0, 0, 1]');
+            this.uieBeta1hat.set('[1, 0, 0]');
+            this.uieBeta2hat.set('[0, 1, 0]');
+            this.uiePNorm.set(500);
+            this.uieQ.set(1e6);
+            
+            
+            this.uiePAzi.set(0);
+            this.uieKAzi.set(0);
+            this.uieBetaAzi.set(0);
+            
+            
             this.uipFileOutput.setSelectedIndex(uint8(2));
             this.uipCustomMask.setSelectedIndex(uint8(1));
             this.uieZPName.set('Untitled');
             
             this.uieZoneTol.set(0.01);
             this.uieAnamorphicFac.set(1);
-
+            
             this.uieLambda.set(13.5);
             this.uieNA.set(0.08);
-            this.cb(this.uieNA);
-
-            this.uieEp.set(this.hc/13.5);
-            this.uieP.set(500);
-            this.uieQ.set(1e10);
             
-            this.uieZernikes.set('[]');
+            this.uieEp.set(this.hc/13.5);
+            
+            
+            
+            
             this.uieObscurationSigma.set(0);
             
             this.uieAlpha.set(0);
@@ -323,6 +419,12 @@ classdef uizpgen < mic.Base
             this.uieZoneBias.set(10);
             this.uieWRVBlockUnit.set(500);
             
+            this.uiePAngle.set(0);
+            this.uieKAngle.set(0);
+            this.uieBeta1Angle.set(0);
+            this.uieBeta2Angle.set(0);
+            
+            
             
             this.uipButtressIdx.setSelectedIndex(uint8(1));
             this.uipNWAPxSize.setSelectedIndex(uint8(1));
@@ -336,10 +438,13 @@ classdef uizpgen < mic.Base
             this.uieMultiplePatN.set(1);
             this.uieMultiplePatIdx.set(1);
             this.uieLayerNumber.set(1);
-                
+            
             this.uicbCenterOffaxisZP.set(true);
             this.uicbOffsetTiltedZP.set(false);
             this.uicbInfiniteConjugate.set(false);
+            
+            
+            
             
             
         end
@@ -403,7 +508,7 @@ classdef uizpgen < mic.Base
                         this.uicbCompressFiles.set(varargin{k+1});
                 end
             end
-                
+            
         end
         
         function D = getD(this)
@@ -417,7 +522,7 @@ classdef uizpgen < mic.Base
             naH = sind(cra) + na;
             
             D = pqmin*(tan(asin(naH)) - tan(asin(naL)));
-
+            
         end
         
         function dr = getTrueDr(this)
@@ -427,19 +532,226 @@ classdef uizpgen < mic.Base
             dr = this.uieLambda.get()/naP/2;
             
         end
-     
+        
+        function setNz(this)
+            
+            dLambda = this.uieLambda.get() / 1000;
+            dNA = this.uieNA.get();
+            dK = eval(this.uieKhat.get());
+            dP = eval(this.uiePhat.get()) * this.uiePNorm.get();
+            dQ = this.uieQ.get();
+            
+            dBeta1 = eval(this.uieBeta1hat.get());
+            dBeta2 = eval(this.uieBeta2hat.get());
+            
+            dn = cross(dBeta1, dBeta2);
+            
+            dTMin = dLambda/dNA;
+            
+            dTh = linspace(0, 2*pi, 101);
+            dTh = dTh(1:end-1);
+            
+            
+            
+            NMax = 1;
+            NMin = 1;
+            
+            Rs = [];
+            for k = 1:length(dTh)
+                th = dTh(k);
+                
+                fq = 1/dTMin * [cos(th), sin(th)] + dK(1:2)/dLambda;
+                
+                % get location of coordinate:
+                r = zpgeom.freq2zpCoord(fq, dn, dP, dLambda);
+                Rs(k) = norm(r - dP, 2);
+                
+                % compute OPD
+                opd = zpgeom.xyz2OPD(r, dP, dQ, dLambda) - ...
+                    zpgeom.xyz2OPD(dP, dP, dQ, dLambda);
+            end
+            
+            NMax = max([NMax, ceil(max(opd) * 2)]);
+            NMin = min([NMin, floor(min(opd) * 2)]);
+            
+            minR = min(Rs);
+            maxR = max(Rs);
+            
+            Nz = NMax - NMin + 1;
+            
+            this.uitNz.set(sprintf('%d', Nz));
+            this.uitD.set(sprintf('%0.2f', maxR * 2));
+            
+        end
+        
+        
+        function updatePhat(this)
+            dTh = this.uiePAngle.get();
+            dPhi = this.uiePAzi.get();
+            
+            if dTh == 0
+                this.uiePhat.set('[0, 0, 1]')
+            elseif dPhi == 0
+                this.uiePhat.set(sprintf('[sind(%g), 0, cosd(%g)]', dTh, dTh));
+            else
+                switch dPhi
+                    case 90
+                        this.uiePhat.set(sprintf('[0, sind(%g), cosd(%g)]', dTh, dTh));
+                    case 180
+                        this.uiePhat.set(sprintf('[-sind(%g), 0, cosd(%g)]', dTh, dTh));
+                    case 270
+                        this.uiePhat.set(sprintf('[0, -sind(%g), cosd(%g)]', dTh, dTh));
+                    otherwise
+                        this.uiePhat.set(sprintf('[cosd(%g)*sind(%g), sind(%g)*sind(%g), cosd(%g)]', dPhi, dTh, dPhi, dTh, dTh));
+                end
+            end
+            this.buildOpticalTemplate();
+        end
+        function updateKhat(this)
+            dTh = this.uieKAngle.get();
+            dPhi = this.uieKAzi.get();
+            
+            
+            if dTh == 0
+                this.uieKhat.set('[0, 0, 1]')
+            elseif dPhi == 0
+                this.uieKhat.set(sprintf('[sind(%g), 0, cosd(%g)]', dTh, dTh));
+            else
+                switch dPhi
+                    case 90
+                        this.uieKhat.set(sprintf('[0, sind(%g), cosd(%g)]', dTh, dTh));
+                    case 180
+                        this.uieKhat.set(sprintf('[-sind(%g), 0, cosd(%g)]', dTh, dTh));
+                    case 270
+                        this.uieKhat.set(sprintf('[0, -sind(%g), cosd(%g)]', dTh, dTh));
+                    otherwise
+                        this.uieKhat.set(sprintf('[cosd(%g)*sind(%g), sind(%g)*sind(%g), cosd(%g)]', dPhi, dTh, dPhi, dTh, dTh));
+                end
+            end
+            this.buildOpticalTemplate();
+        end
+        function updateBhat(this)
+            dTh = this.uieBeta1Angle.get();
+            dPhi = this.uieBetaAzi.get();
+            
+            
+            if dTh == 0
+                this.uieBeta1hat.set('[1, 0, 0]')
+                this.uieBeta2hat.set(sprintf('[0, 1, 0]'));
+            elseif dPhi == 0
+                this.uieBeta1hat.set(sprintf('[cosd(%g), 0, -sind(%g)]', dTh, dTh));
+                this.uieBeta2hat.set(sprintf('[0, 1, 0]'));
+            else
+                switch dPhi
+                    case 90
+                        this.uieBeta1hat.set(sprintf('[1, 0, 0]'));
+                        this.uieBeta2hat.set(sprintf('[0, cosd(%g), -sind(%g)]', dTh, dTh));
+                    case 180
+                        this.uieBeta1hat.set(sprintf('[cosd(%g), 0, sind(%g)]', dTh, dTh));
+                        this.uieBeta2hat.set(sprintf('[0, 1, 0]'));
+                    case 270
+                        this.uieBeta1hat.set(sprintf('[1, 0, 0]'));
+                        this.uieBeta2hat.set(sprintf('[0, cosd(%g), sind(%g)]', dTh, dTh));
+                    otherwise
+                        
+                end
+            end
+            this.buildOpticalTemplate();
+        end
+        
+        
+        
         function cb(this, src, dat)
             switch src
+                case this.uiePhat
+                    % Sanitize:
+                    dP = eval(this.uiePhat.get());
+                    dP = dP/norm(dP,2);
+                    this.uiePhat.set(sprintf('[%g, %g, %g]', dP(1), dP(2), dP(3)));
+                    
+                    % set angle in degrees to difference between this and
+                    % z-hat:
+                    dTh = acosd(dP * [0;0;1]);
+                    dRes = [0,0, 1] - dP;
+                    dAzi = atan2(dRes(2), dRes(1));
+                    
+                    this.uiePAngle.setWithoutNotify(dTh);
+                    this.uiePAzi.setWithoutNotify(dAzi);
+                    
+                    this.setNz();
+                    this.buildOpticalTemplate();
+                    
+                case this.uiePNorm
+                    
+                    this.setNz();
+                    this.buildOpticalTemplate();
+                    
+                case this.uiePAngle
+                    this.updatePhat();
+                case this.uiePAzi
+                    this.updatePhat();
+                case this.uieKhat
+                    dK = eval(this.uieKhat.get());
+                    
+                    dK = dK/norm(dK,2);
+                    this.uieKhat.set(sprintf('[%g, %g, %g]', dK(1), dK(2), dK(3)));
+                    
+                    
+                    dTh = acosd(dK * [0;0;1]);
+                    dRes = [0,0, 1] - dK;
+                    dAzi = atan2(dRes(2), dRes(1));
+                    
+                    this.uieKAngle.setWithoutNotify(dTh);
+                    this.uieKAzi.setWithoutNotify(dAzi);
+                    
+                    this.buildOpticalTemplate();
+                    
+                case this.uieKAngle
+                    this.updateKhat();
+                case this.uieKAzi
+                    this.updateKhat();
+                    
+                case this.uieBeta1hat
+                    % Sanitize:
+                    dB = eval(this.uieBeta1hat.get());
+                    dB = dB/norm(dB,2);
+                    this.uieBeta1hat.set(sprintf('[%g, %g, %g]', dB(1), dB(2), dB(3)));
+                    
+                    this.buildOpticalTemplate();
+                    
+                    
+                    
+                case this.uieBeta2hat
+                    % Sanitize:
+                    dB = eval(this.uieBeta2hat.get());
+                    dB = dB/norm(dB,2);
+                    this.uieBeta2hat.set(sprintf('[%g, %g, %g]', dB(1), dB(2), dB(3)));
+                    
+                    this.buildOpticalTemplate();
+                    
+                case this.uieBeta1Angle
+                    this.updateBhat();
+                case this.uieBetaAzi
+                    this.updateBhat();
+                    
+                case this.uieBeta2Angle
+                    
+                    
+                    this.buildOpticalTemplate();
                 case this.uibGenerate
                     this.generate();
                     
                 case this.uieCraAngle
                     this.uitD.set(sprintf('%0.2f', this.getD()));
                     this.uitTrueDr.set(sprintf('%0.3f', this.getTrueDr()));
+                    this.setNz();
+                    
                 case this.uieP
                     this.uitD.set(sprintf('%0.2f', this.getD()));
+                    this.setNz();
                 case this.uieQ
                     this.uitD.set(sprintf('%0.2f', this.getD()));
+                    this.setNz();
                 case this.uieNA
                     this.uie4xNA.setWithoutNotify(this.uieNA.get()*4)
                     setVal = this.uieLambda.get()/this.uieNA.get()/2;
@@ -448,22 +760,28 @@ classdef uizpgen < mic.Base
                     
                     this.uitD.set(sprintf('%0.2f', this.getD()));
                     this.uitTrueDr.set(sprintf('%0.3f', this.getTrueDr()));
+                    this.setNz();
+                    this.buildOpticalTemplate();
                 case this.uie4xNA
                     this.uieNA.setWithoutNotify(this.uie4xNA.get()/4)
                     setVal = this.uieLambda.get()/this.uieNA.get()/2;
                     this.uieDr.setWithoutNotify(setVal)
                     
                     this.uitD.set(sprintf('%0.2f', this.getD()));
+                    
+                    this.buildPupilView();
                 case this.uieDr
                     setVal = this.uieLambda.get()/this.uieDr.get()/2;
                     this.uieNA.setWithoutNotify(setVal)
                     this.uie4xNA.setWithoutNotify(setVal * 4)
                     
                     this.uitD.set(sprintf('%0.2f', this.getD()));
+                    
+                    this.buildPupilView();
                 case this.uicbInfiniteConjugate
                     
                     if (this.uicbInfiniteConjugate.get())
-                        this.uieQ.setWithoutNotify(1e15);   
+                        this.uieQ.setWithoutNotify(1e15);
                     end
                     
                 case this.uieEp
@@ -478,9 +796,11 @@ classdef uizpgen < mic.Base
                     this.uieEp.setWithoutNotify(setVal)
                     
                     this.uitTrueDr.set(sprintf('%0.3f', this.getTrueDr()));
-                    this.uitD.set(sprintf('%0.2f', this.getD()));
+                    this.setNz();                    this.uitD.set(sprintf('%0.2f', this.getD()));
                     
                     this.cb(this.uieNA);
+                    
+                    this.buildPupilView();
                 case this.uibLoad
                     this.load();
                     this.stageZP();
@@ -490,21 +810,21 @@ classdef uizpgen < mic.Base
                     this.stageZP();
                 case this.uibStageAndGenerate
                     this.stageAndGenerate();
-                
+                    
                 case this.uibOpenInFinder
                     if strcmp(this.arch, 'win64')
                         system(sprintf('explorer %s', fullfile(this.cOutputFileDir)));
                     else
                         system(sprintf('open %s', fullfile(this.cOutputFileDir)));
-
+                        
                     end
-                case this.uipFileOutput 
+                case this.uipFileOutput
                     if this.uipFileOutput.getSelectedIndex() == uint8(1)
                         this.uipNWAPxSize.setSelectedIndex(uint8(5));
                     else
                         this.uipNWAPxSize.setSelectedIndex(uint8(1));
                     end
-                case this.uipNWAPxSize 
+                case this.uipNWAPxSize
                     if this.uipFileOutput.getSelectedIndex() == uint8(1) && this.uipNWAPxSize.getSelectedIndex() == uint8(1)
                         this.uipNWAPxSize.setSelectedIndex(uint8(5));
                     end
@@ -515,11 +835,11 @@ classdef uizpgen < mic.Base
                         this.uieNumBlocks.set(dVal^2);
                     end
                     if dVal > 1
-                       % set blocksize to 800k
-                       this.uieBlockSize.set(800000);
+                        % set blocksize to 800k
+                        this.uieBlockSize.set(800000);
                     end
                     
-            
+                    
             end
         end
         
@@ -527,6 +847,143 @@ classdef uizpgen < mic.Base
             this.stageZP();
             drawnow;
             zpFilePath = this.generate();
+        end
+        
+        
+        function buildPupilView(this)
+            
+            for k = 1:length(this.hPatches)
+                delete(this.hPatches{k})
+            end
+            this.hPatches = {};
+            
+            th = linspace(0, 2*pi, 101);
+            th = th(1:end-1);
+            
+            Rx = this.uieNA.get();
+            Ry = this.uieNA.get()/this.uieAnamorphicFac.get();
+            
+            X = Rx * cos(th);
+            Y = Ry * sin(th);
+            
+            this.hPatches{end+1} = patch('Parent', this.haPupil, 'XData', X, 'YData', Y, 'FaceColor', 'g');
+            
+        end
+        
+        function buildOpticalTemplate(this)
+            
+            dP = eval(this.uiePhat.get());
+            %             dPNorm = this.uiePNorm.get();% = eval(this.uiePhat.get());
+            dPNorm = 8;
+            
+            dK = eval(this.uieKhat.get());
+            dKNorm = 1/norm(dK ,2);
+            
+            dB1 = eval(this.uieBeta1hat.get());
+            dB2 = eval(this.uieBeta2hat.get());
+            dB3 = cross(dB2, dB1);
+            
+            % Plotting the main axes on the given axes handle this.haGeom
+            
+            %             hold(this.haGeom, 'on');
+            
+            if ~isempty(this.hLines)
+                for k = 1:length(this.hLines)
+                    delete(this.hLines{k});
+                    
+                end
+                
+                this.hLines = {};
+                
+            end
+            
+            
+            
+            % z-axis (left to right)
+            this.hLines{end+1} = line(this.haGeom, [-1, 16], [0, 0], [0, 0], 'Color', 'k', 'LineStyle', ':','LineWidth', 1);
+            
+            
+            
+            % y-axis (up and down)
+            this.hLines{end+1} = line(this.haGeom, [0, 0], [-1, 1], [0, 0], 'Color', 'b', 'LineWidth', 1);
+            
+            % x-axis (in and out of the page)
+            this.hLines{end+1} = line(this.haGeom, [0, 0], [0, 0], [-1, 1], 'Color', 'b', 'LineWidth', 1);
+            
+            % Plotting the shifted x and y axes centered on z-axis at z = 8
+            
+            % shifted x-axis
+            %             this.hLines{end+1} = line(this.haGeom, [8, 8], [0, 0], [-1, 1], 'Color', 'b', 'LineWidth', 1.5);
+            %             this.hLines{end+1} = line(this.haGeom, [8, 8], [-1, 1], [0, 0], 'Color', 'b', 'LineWidth', 1.5);
+            %
+            %             % shifted x-axis
+            %             this.hLines{end+1} = line(this.haGeom, [16, 16], [0, 0], [-1, 1], 'Color', 'b', 'LineWidth', 1.5);
+            %             this.hLines{end+1} = line(this.haGeom, [16, 16], [-1, 1], [0, 0], 'Color', 'b', 'LineWidth', 1.5);
+            
+            
+            % Draw k vector and P vectors
+            this.hLines{end+1} = line(this.haGeom, [0, 2*dP(3)*dPNorm], [0, 2*dP(1)*dPNorm], [0, 2*dP(2)*dPNorm], 'Color', 'g', 'LineWidth', 3);
+            this.hLines{end+1} = line(this.haGeom, [-dK(3)*dKNorm, 0], [-dK(1)*dKNorm, 0], [-dK(2)*dKNorm, 0], 'Color', 'r', 'LineWidth', 3);
+            this.hLines{end+1} = line(this.haGeom, [0, 8* dK(3)*dKNorm], [0, 8*dK(1)*dKNorm], [0, 8*dK(2)*dKNorm], 'Color', 'r', 'LineWidth', 0.5);
+            this.hLines{end+1} = line(this.haGeom, [8* dK(3)*dKNorm, 2*dP(3)*dPNorm], [8*dK(1)*dKNorm, 2*dP(1)*dPNorm], [8*dK(2)*dKNorm, 2*dP(2)*dPNorm], 'Color', 'r', 'LineWidth', 0.5);
+            
+            
+            % Draw ZP axes
+            this.hLines{end+1} = line(this.haGeom, 8* dK(3)*dKNorm*[1,1], 8*dK(1)*dKNorm*[1,1],  8*dK(2)*dKNorm + [-1, 1], 'Color', 'm', 'LineWidth', 1);
+            this.hLines{end+1} = line(this.haGeom, 8* dK(3)*dKNorm*[1,1], 8*dK(1)*dKNorm + [-1, 1], [1,1] * 8*dK(2)*dKNorm, 'Color', 'm', 'LineWidth', 1);
+            
+            % Draw ZP normal:
+            this.hLines{end+1} = line(this.haGeom, [0, dB3(3)] + 8*dK(3)*dKNorm, [0, dB3(1)] + 8*dK(1)*dKNorm,[0, dB3(2)] +  8*dK(2)*dKNorm, 'Color', [1, 0.5, 0], 'LineWidth', 3);
+            
+            
+            % Draw OAxis axes:
+            this.hLines{end+1} = line(this.haGeom,  dP(3)*dPNorm*[1,1], dP(1)*dPNorm*[1,1],  dP(2)*dPNorm + [-1, 1], 'Color', 'b', 'LineWidth', 1.5);
+            this.hLines{end+1} = line(this.haGeom, dP(3)*dPNorm*[1,1], dP(1)*dPNorm + [-1, 1], [1,1] * dP(2)*dPNorm, 'Color', 'b', 'LineWidth', 1.5);
+            this.hLines{end+1} = line(this.haGeom,  2*dP(3)*dPNorm*[1,1], 2*dP(1)*dPNorm*[1,1],  2*dP(2)*dPNorm + [-1, 1], 'Color', 'b', 'LineWidth', 1.5);
+            this.hLines{end+1} = line(this.haGeom, 2*dP(3)*dPNorm*[1,1], 2*dP(1)*dPNorm + [-1, 1], 2*[1,1] * dP(2)*dPNorm, 'Color', 'b', 'LineWidth', 1.5);
+            
+            % Adjust the view
+            view(this.haGeom, -20, 30);  % Adjust for the perspective where z-axis is horizontal
+            
+            % Set axis properties
+            axis(this.haGeom, 'equal');
+            grid(this.haGeom, 'on');
+            xlabel(this.haGeom, 'Z');
+            ylabel(this.haGeom, 'X');
+            zlabel(this.haGeom, 'Y');
+            
+            hold(this.haXZ, 'on');
+            grid(this.haXZ, 'on');
+            
+            this.hLines{end+1} = quiver3(this.haXZ, 0,0, 0, dPNorm/8 *dP(3), dPNorm/8 *dP(1), dPNorm/8 *dP(2), 'Color','g', 'linewidth', 2);
+            this.hLines{end+1} = quiver3(this.haXZ, 0, 0, 0, dB3(3), dB3(1), dB3(2),'Color',[1, 0.5, 0],'linewidth', 2);
+            this.hLines{end+1} = quiver3(this.haXZ, -dK(3), -dK(1), -dK(2), dK(3), dK(1), dK(2), 'Color','r','linewidth', 2);
+            
+            this.hLines{end+1} = line(this.haXZ, [-1, 1], [0,0], 'Color', 'k', 'LineStyle', ':','LineWidth', 1);
+            
+            view(this.haXZ, 0, 90)
+            axis(this.haXZ, [-1, 1, -1, 1, -1, 1])
+            xlabel(this.haXZ, 'Z');
+            ylabel(this.haXZ, 'X');
+            
+            
+            hold(this.haXZ, 'off');
+            
+            hold(this.haYZ, 'on');
+            grid(this.haYZ, 'on');
+            
+            xlabel(this.haYZ, 'Z');
+            ylabel(this.haYZ, 'Y');
+            
+            this.hLines{end+1} = quiver3(this.haYZ, 0,0, 0, dPNorm/8 *dP(3), dPNorm/8 *dP(1), dPNorm/8 *dP(2), 'Color','g', 'linewidth', 2);
+            this.hLines{end+1} = quiver3(this.haYZ, 0, 0, 0, dB3(3), dB3(1), dB3(2),'Color',[1, 0.5, 0],'linewidth', 2);
+            this.hLines{end+1} = quiver3(this.haYZ, -dK(3), -dK(1), -dK(2), dK(3), dK(1), dK(2), 'Color','r','linewidth', 2);
+            
+            this.hLines{end+1} = line(this.haYZ, [-1, 1], [0,0], 'Color', 'k', 'LineStyle', ':','LineWidth', 1);
+            
+            view(this.haYZ, 0, 0)
+            axis(this.haYZ, [-1, 1, -1, 1, -1, 1])
+            hold(this.haYZ, 'off');
         end
         
         function build(this)
@@ -544,94 +1001,228 @@ classdef uizpgen < mic.Base
                 
             end
             
+            
+            this.hUIPanelFile = uipanel(...
+                'Parent', this.hFigure,...
+                'Units', 'pixels',...
+                'Title', 'File',...
+                'FontWeight', 'Bold',...
+                'Clipping', 'on',...
+                'BorderWidth',1, ...
+                'Position', mic.Utils.lt2lb([20 20 860 100], this.hFigure) ...
+                );
+            
+            this.hUIPanelOptical = uipanel(...
+                'Parent', this.hFigure,...
+                'Units', 'pixels',...
+                'Title', 'Optical',...
+                'FontWeight', 'Bold',...
+                'Clipping', 'on',...
+                'BorderWidth',1, ...
+                'Position', mic.Utils.lt2lb([20 140 860 620], this.hFigure) ...
+                );
+            
+            this.hUIPanelPattern = uipanel(...
+                'Parent', this.hFigure,...
+                'Units', 'pixels',...
+                'Title', 'Pattern',...
+                'FontWeight', 'Bold',...
+                'Clipping', 'on',...
+                'BorderWidth',1, ...
+                'Position', mic.Utils.lt2lb([890 20 600 360], this.hFigure) ...
+                );
+            
+            this.hUIPanelExecute = uipanel(...
+                'Parent', this.hFigure,...
+                'Units', 'pixels',...
+                'Title', 'Execute',...
+                'FontWeight', 'Bold',...
+                'Clipping', 'on',...
+                'BorderWidth',1, ...
+                'Position', mic.Utils.lt2lb([890 400 600 360], this.hFigure) ...
+                );
+            
+            
+            this.haGeom = axes('Parent', this.hUIPanelOptical, ...
+                'Units', 'pixels', ...
+                'Position', [0, 30, 920, 200], ...
+                'XTick', [], 'YTick', []);
+            
+            this.haXZ = axes('Parent', this.hUIPanelOptical, ...
+                'Units', 'pixels', ...
+                'Position', [340, 275, 125, 125], ...
+                'XTick', [], 'YTick', []);
+            
+            
+            this.haYZ = axes('Parent', this.hUIPanelOptical, ...
+                'Units', 'pixels', ...
+                'Position', [510, 275, 125, 125], ...
+                'XTick', [], 'YTick', []);
+            
+            this.haPupil = axes('Parent', this.hUIPanelOptical, ...
+                'Units', 'pixels', ...
+                'Position', [670   425   170   170], ...
+                'XTick', [], 'YTick', []);
+            this.buildOpticalTemplate();
+            this.buildPupilView();
+            
+            
             dCol1 = 30;
             dCol2 = 130;
             dCol3 = 230;
             dCol4 = 330;
             dCol5 = 430;
+            dCol6 = 530;
             
             dYWid = 45;
             
             % build ZPpropagator:
-%             this.uiZPPropagator.build(this.hFigure, 500, 20);
-            
-                        
-            this.uieZPName.build(this.hFigure, dCol1, dYWid, 200, 30);
-            this.uibSave.build(this.hFigure, dCol3 + 20, dYWid + 10, 75, 40);
-            this.uibLoad.build(this.hFigure, dCol4 + 20, dYWid + 10, 75, 40);
-            this.uibStageAndGenerate.build(this.hFigure, dCol5 + 20, dYWid + 10 , 100, 40);
-            this.uibOpenInFinder.build(this.hFigure, dCol5 + 20, dYWid*2 + 10, 100, 40);
-
-            this.uipFileOutput.build(this.hFigure, dCol1, 2*dYWid, 200, 30);
-            this.uicbCompressFiles.build(this.hFigure, dCol3 + 20, 2*dYWid + 10, 180, 30);
-            this.uicbComputeExternally.build(this.hFigure, dCol3 + 20, 2*dYWid + 33, 180, 30);
-            
-            this.uieZoneTol.build(this.hFigure, dCol1, 3*dYWid, 75, 30);
-            this.uieZoneBias.build(this.hFigure, dCol2, 3*dYWid, 75, 30);
-
-            this.uieLambda.build(this.hFigure, dCol1, 4*dYWid, 75, 30);
-            this.uieEp.build(this.hFigure, dCol2, 4*dYWid, 75, 30);
-            
-            this.uieNA.build(this.hFigure, dCol1, 5*dYWid, 75, 30);
-            this.uie4xNA.build(this.hFigure, dCol2, 5*dYWid, 75, 30);
-
-            this.uieDr.build(this.hFigure, dCol3, 5*dYWid, 75, 30);
-            
-            this.uitDLabel.build(this.hFigure, dCol5, 5*dYWid, 75, 30);
-            this.uitD.build(this.hFigure, dCol5, 5*dYWid + 20, 75, 30);
-            
-            this.uitTrueDrLabel.build(this.hFigure, dCol4, 5*dYWid, 75, 30);
-            this.uitTrueDr.build(this.hFigure, dCol4, 5*dYWid + 20, 75, 30);
-
-            this.uieP.build(this.hFigure, dCol1, 6*dYWid, 75, 30);
-            this.uieQ.build(this.hFigure, dCol2, 6*dYWid, 75, 30);
-            this.uicbInfiniteConjugate.build(this.hFigure, dCol3, 6*dYWid + 10, 120, 30);
-            
-            this.uieCraAngle.build(this.hFigure, dCol1, 7*dYWid, 75, 30);
-            this.uieCraAz.build(this.hFigure, dCol2, 7*dYWid, 75, 30);
-            this.uieZPTilt.build(this.hFigure, dCol3, 7*dYWid, 75, 30);
+            %             this.uiZPPropagator.build(this.hFigure, 500, 20);
             
             
-            this.uipButtressIdx.build(this.hFigure, dCol1, 9*dYWid, 150, 30);
-            this.uieButtressW.build(this.hFigure, dCol3, 9*dYWid, 75, 30);
-            this.uieButtressT.build(this.hFigure, dCol4, 9*dYWid, 75, 30);
-            this.uicbReverseTone.build(this.hFigure, dCol1, 10*dYWid + 10, 120, 30);
+            row = 0.5;
+            
+            % File
+            this.uieZPName.build(this.hUIPanelFile, dCol1, row*dYWid, 270, 30);
+            this.uibSave.build(this.hUIPanelFile, dCol3 + 100, row*dYWid + 10, 75, 40);
+            this.uibLoad.build(this.hUIPanelFile, dCol4 + 100, row*dYWid + 10, 75, 40);
+            this.uibOpenInFinder.build(this.hUIPanelFile, dCol5 + 100, row*dYWid + 10, 100, 40);
+            
+            % Optical
+            row = 0.5; % ====
+            dW = 70;
+            this.uieLambda.build(this.hUIPanelOptical, dCol1, row*dYWid, 60, 30);
+            this.uieEp.build(this.hUIPanelOptical, dCol1 + 1*dW, row*dYWid, 60, 30);
+            this.uieNA.build(this.hUIPanelOptical, dCol1 + 2*dW, row*dYWid, 60, 30);
+            this.uie4xNA.build(this.hUIPanelOptical, dCol1 + 3*dW, row*dYWid, 60, 30);
+            this.uieDr.build(this.hUIPanelOptical, dCol1 + 4*dW, row*dYWid, 60, 30);
+            
+            this.uitTrueDrLabel.build(this.hUIPanelOptical, dCol1 + 5.5*dW, row*dYWid, 80, 30);
+            this.uitTrueDr.build(this.hUIPanelOptical,  dCol1 + 5.5*dW, row*dYWid + 20, 60, 30);
+            
+            this.uitDLabel.build(this.hUIPanelOptical,  dCol1 + 6.5*dW, row*dYWid, 80, 30);
+            this.uitD.build(this.hUIPanelOptical, dCol1 + 6.5*dW, row*dYWid + 20, 60, 30);
+            
+            this.uitNzLabel.build(this.hUIPanelOptical, dCol1 + 7.5*dW, row*dYWid, 100, 30);
+            this.uitNz.build(this.hUIPanelOptical,  dCol1 + 7.5*dW, row*dYWid + 20, 60, 30);
             
             
-            this.uieZernikes.build(this.hFigure, dCol1, 11*dYWid, 300, 30);
-
-            this.uipCustomMask.build(this.hFigure, dCol1, 12*dYWid, 250, 30);
-                        
-            this.uieObscurationSigma.build(this.hFigure, dCol1, 13*dYWid, 75, 30);
-            this.uieZPCR1.build(this.hFigure, dCol2, 14*dYWid, 75, 30);
-            this.uieZPCR2.build(this.hFigure, dCol3, 14*dYWid, 75, 30);
-            this.uieZPPhase.build(this.hFigure, dCol4, 14*dYWid, 75, 30);
-            this.uieAnamorphicFac.build(this.hFigure, dCol2, 13*dYWid, 90, 30);
+            row = row + 1.5; % ====
             
-%             this.uieApodMag.build(this.hFigure, dCol1, 14*dYWid, 75, 30);
-%             
-%             this.uipApodFn.build(this.hFigure, dCol2, 14*dYWid, 150, 30);
-
+            this.uieObscurationSigma.build(this.hUIPanelOptical, dCol1, row*dYWid, 60, 30);
+            this.uieAnamorphicFac.build(this.hUIPanelOptical, dCol1 + 1*dW, row*dYWid, 60, 30);
             
-%             this.uieDoseBiasScaling.build(this.hFigure, dCol1, 15*dYWid, 75, 30);
-%             this.uieMultiplePatN.build(this.hFigure, dCol2, 15*dYWid, 75, 30);
-%             this.uieMultiplePatIdx.build(this.hFigure, dCol3, 15*dYWid, 75, 30);
-            this.uieBlockSize.build(this.hFigure, dCol1, 15*dYWid, 80, 30);
-            this.uieNumBlocks.build(this.hFigure, dCol2, 15*dYWid, 80, 30);
-            this.uieBlockGrid.build(this.hFigure, dCol3, 15*dYWid, 80, 30);
-            this.uieWRVBlockUnit.build(this.hFigure, dCol4, 15*dYWid, 80, 30);
-            this.uicbRandomizeWRVZones.build(this.hFigure, dCol5, 15*dYWid + 10, 150, 30);
-            this.uicbCenterOffaxisZP.build(this.hFigure, dCol5, 16*dYWid -5, 115, 30);
-            this.uicbOffsetTiltedZP.build(this.hFigure, dCol5, 17*dYWid -5, 115, 30);
-
+            this.uieZernikes.build(this.hUIPanelOptical, dCol1 + 2*dW, row*dYWid, 220, 30);
             
-            this.uieLayerNumber.build(this.hFigure, dCol1, 16*dYWid, 75, 30);
-            %this.uicbCurl.build(this.hFigure, dCol2, 16*dYWid + 10, 75, 30);
-            this.uipNWAPxSize.build(this.hFigure, dCol2, 16*dYWid + 10, 150, 30);
-            this.uibStageZP.build(this.hFigure, dCol1 , 17*dYWid + 10 , 100, 30);
-            this.uibGenerate.build(this.hFigure, dCol2, 17*dYWid + 10 , 100, 30);
-            this.uieExecStr.build(this.hFigure, dCol1, 18*dYWid, 500, 60);
+            this.uipCustomMask.build(this.hUIPanelOptical, dCol5, row*dYWid, 200, 30);
+            
+            
+            
+            
+            
+            
+            
+            row = row + 0.5; % ====
+            
+            
+            row = row + 1; % ====
+            dCol2_5 = dCol2 + 30;
+            dCol3_2 = dCol3 + 10;
+            this.uiePhat.build(this.hUIPanelOptical, dCol1, row*dYWid, 120, 30);
+            this.uiePAngle.build(this.hUIPanelOptical, dCol2_5 , row*dYWid, 65, 30);
+            this.uiePAzi.build(this.hUIPanelOptical, dCol3_2 , row*dYWid, 65, 30);
+            
+            this.uiePNorm.build(this.hUIPanelOptical, dCol4, row*dYWid, 75, 30);
+            this.uieQ.build(this.hUIPanelOptical, dCol5, row*dYWid, 75, 30);
+            this.uicbInfiniteConjugate.build(this.hUIPanelOptical, dCol6, row*dYWid + 10, 120, 30);
+            
+            
+            
+            
+            row = row + 1; % ====
+            this.uieKhat.build(this.hUIPanelOptical, dCol1, row*dYWid, 120, 30);
+            this.uieKAngle.build(this.hUIPanelOptical, dCol2_5, row*dYWid, 65, 30);
+            this.uieKAzi.build(this.hUIPanelOptical, dCol3_2 , row*dYWid, 65, 30);
+            
+            
+            row = row + 1; % ====
+            this.uieBeta1hat.build(this.hUIPanelOptical, dCol1, row*dYWid, 120, 30);
+            this.uieBeta1Angle.build(this.hUIPanelOptical, dCol2_5, row*dYWid, 65, 30);
+            this.uieBetaAzi.build(this.hUIPanelOptical, dCol3_2 , row*dYWid, 65, 30);
+            
+            row = row + 1; % ====
+            this.uieBeta2hat.build(this.hUIPanelOptical, dCol1, row*dYWid, 120, 30);
+            %             this.uieBeta2Angle.build(this.hUIPanelOptical, dCol2_5, row*dYWid, 65, 30);
+            
+            
+            
+            
+            
+            
+            row = row + 1.5; % ====
+            
+            
+            %             row = row + 1; % ====
+            %             this.uieZPCR1.build(this.hUIPanelOptical, dCol2, row*dYWid, 75, 30);
+            %             this.uieZPCR2.build(this.hUIPanelOptical, dCol3, row*dYWid, 75, 30);
+            %             this.uieZPPhase.build(this.hUIPanelOptical, dCol4, row*dYWid, 75, 30);
+            %
+            
+            % Pattern
+            row = 0.5; % ====
+            this.uieZoneTol.build(this.hUIPanelPattern, dCol1, row*dYWid, 75, 30);
+            this.uieZoneBias.build(this.hUIPanelPattern, dCol2, row*dYWid, 75, 30);
+            
+            
+            row = row + 1; % ====
+            this.uipButtressIdx.build(this.hUIPanelPattern, dCol1, row*dYWid, 150, 30);
+            this.uieButtressW.build(this.hUIPanelPattern, dCol3, row*dYWid, 75, 30);
+            this.uieButtressT.build(this.hUIPanelPattern, dCol4, row*dYWid, 75, 30);
+            
+            
+            row = row + 1; % ====
+            this.uicbReverseTone.build(this.hUIPanelPattern, dCol1, row*dYWid + 10, 120, 30);
+            
+            row = row + 1; % ====
+            this.uieBlockSize.build(this.hUIPanelPattern, dCol1, row*dYWid, 80, 30);
+            this.uieNumBlocks.build(this.hUIPanelPattern, dCol2, row*dYWid, 80, 30);
+            this.uieBlockGrid.build(this.hUIPanelPattern, dCol3, row*dYWid, 80, 30);
+            this.uieWRVBlockUnit.build(this.hUIPanelPattern, dCol4, row*dYWid, 80, 30);
+            this.uicbRandomizeWRVZones.build(this.hUIPanelPattern, dCol5, row*dYWid + 10, 150, 30);
+            
+            row = row + 1; % ====
+            this.uicbCenterOffaxisZP.build(this.hUIPanelPattern, dCol5, row*dYWid -5, 115, 30);
+            
+            row = row + 1; % ====
+            this.uieLayerNumber.build(this.hUIPanelPattern, dCol1, row*dYWid, 75, 30);
+            this.uipNWAPxSize.build(this.hUIPanelPattern, dCol2, row*dYWid + 10, 150, 30);
+            this.uicbOffsetTiltedZP.build(this.hUIPanelPattern, dCol5, row*dYWid -5, 115, 30);
+            
+            
+            
+            
+            % Execute
+            
+            row = 1;
+            this.uibStageAndGenerate.build(this.hUIPanelExecute, dCol5 , dYWid + 10 , 120, 40);
+            this.uipFileOutput.build(this.hUIPanelExecute, dCol1, dYWid, 200, 30);
+            this.uicbCompressFiles.build(this.hUIPanelExecute, dCol3 + 20, dYWid + 10, 180, 30);
+            this.uicbComputeExternally.build(this.hUIPanelExecute, dCol3 + 20, dYWid + 33, 180, 30);
+            
+            
+            row = row + 1; %====
+            this.uibStageZP.build(this.hUIPanelExecute, dCol1 , row*dYWid + 10 , 100, 30);
+            this.uibGenerate.build(this.hUIPanelExecute, dCol2, row*dYWid + 10 , 100, 30);
+            
+            row = row + 1; %====
+            this.uieExecStr.build(this.hUIPanelExecute, dCol1, row*dYWid, 500, 160);
+            
+            row = row + 1; %====
             this.uieExecStr.makeMax();
+            
+            
+            
+            
             
         end
         
@@ -642,7 +1233,7 @@ classdef uizpgen < mic.Base
                 str = ' 0 ';
             elseif mod(length(dZterms), 2) ~= 0
                 error('Zernike string array must have an even number of elements');
-                    
+                
             else
                 str = sprintf(' %d', length(dZterms)/2);
                 for k = 1:2:length(dZterms)
@@ -650,7 +1241,27 @@ classdef uizpgen < mic.Base
                 end
             end
         end
+        
+        function out = makeArStr(this, str)
+            d = eval(str);
+            out = [];
             
+            for k = 1:length(d)
+                out = [out, sprintf('%0.6f ', d(k))];
+            end
+            
+        end
+        
+        function out = makePString(this)
+            d = eval(this.uiePhat.get()) * this.uiePNorm.get();
+            out = [];
+            
+            for k = 1:length(d)
+                out = [out, sprintf('%0.6f ', d(k))];
+            end
+            
+        end
+        
         
         
         function load(this, path)
@@ -670,14 +1281,14 @@ classdef uizpgen < mic.Base
             
             % Set some default params:
             this.uicbInfiniteConjugate.set(false);
-           
+            
             
             for k = 1:length(ceProps)
-                 % process exceptions:
+                % process exceptions:
                 if (this.bIgnoreFileFormatOnLoad && strcmp(ceProps{k}, 'uipFileOutput'))
                     continue;
                 end
-            
+                
                 if (length(ceProps{k}) > 2)
                     try
                         switch ceProps{k}(1:3)
@@ -696,7 +1307,7 @@ classdef uizpgen < mic.Base
             % Set lambda and NA to force compute dr and Ep
             this.cb(this.uieLambda);
             this.cb(this.uieNA);
-           
+            
             
             
         end
@@ -706,27 +1317,27 @@ classdef uizpgen < mic.Base
             ceProps = properties(this);
             sSaveStruct = struct;
             try
-            for k = 1:length(ceProps)
-                if (length(ceProps{k}) > 2)
-                    switch ceProps{k}(1:3)
-                        case 'uie'
-                            sSaveStruct.(ceProps{k}) = this.(ceProps{k}).get();
-                        case 'uic'
-                            sSaveStruct.(ceProps{k}) = this.(ceProps{k}).get();
-                        case 'uip'
-                            sSaveStruct.(ceProps{k}) = this.(ceProps{k}).getSelectedIndex();
+                for k = 1:length(ceProps)
+                    if (length(ceProps{k}) > 2)
+                        switch ceProps{k}(1:3)
+                            case 'uie'
+                                sSaveStruct.(ceProps{k}) = this.(ceProps{k}).get();
+                            case 'uic'
+                                sSaveStruct.(ceProps{k}) = this.(ceProps{k}).get();
+                            case 'uip'
+                                sSaveStruct.(ceProps{k}) = this.(ceProps{k}).getSelectedIndex();
+                        end
                     end
                 end
-            end
             catch me
-            1    
+                1
             end
             
             cPath = fullfile(this.cZPGenDir, 'recipes', [regexprep(this.uieZPName.get(), '\s', '_') '.mat']);
             save(cPath, 'sSaveStruct');
         end
         
-
+        
         
         function sFilePath = generate(this)
             tic
@@ -736,7 +1347,7 @@ classdef uizpgen < mic.Base
             if (this.uicbComputeExternally.get()) && this.uipFileOutput.getSelectedIndex() ~= uint8(4) % can't compute WRV externally if we need to run perl scripts
                 system([cExecSt, '&']);
             else
-               % tic
+                % tic
                 system(cExecSt);
                 %fprintf('\nGeneration took %s\n', s2f(toc));
             end
@@ -750,7 +1361,7 @@ classdef uizpgen < mic.Base
             zpgen.writeLog(sFileName, this.cLogStr, false, 'a');
             
             
-             % Create a single log in ZPFiles
+            % Create a single log in ZPFiles
             sSingleLogFileName = fullfile(this.cOutputFileDir, 'ZPFiles', sprintf('ZPLog_%s_%s.csv', this.uieZPName.get(), datestr(now, 29)));
             % check if file exists:
             zpgen.writeLog(sSingleLogFileName, this.ceHeaders, true, 'w');
@@ -774,7 +1385,7 @@ classdef uizpgen < mic.Base
             end
             
             
-            % Execute optional PERL scripts for WRV/NWA processing 
+            % Execute optional PERL scripts for WRV/NWA processing
             dNBlocks = round(sqrt(this.uieNumBlocks.get()));
             
             if isempty(this.cOutputFileDir)
@@ -792,7 +1403,7 @@ classdef uizpgen < mic.Base
                     
                     cExStr = sprintf('%s %s %s.wrv %s_randomized.wrv', ...
                         cPerlStr, ...
-                        fullfile(this.cDirThis, '..', 'bin', 'randomizeWRV.pl'), ... 
+                        fullfile(this.cDirThis, '..', 'bin', 'randomizeWRV.pl'), ...
                         sFilePath, sFilePath);
                     
                     fprintf('Exec perl command: \n\t%s\n\n', cExStr);
@@ -803,24 +1414,24 @@ classdef uizpgen < mic.Base
                 end
                 
                 % Splitting into multiple fields:
-               
+                
                 if dNBlocks > 1
                     
                     fprintf('Splitting WRV into fields...\n\n');
                     cExStr = sprintf('%s %s %s.wrv %d %d %s_multifield.wrv', ...
                         cPerlStr, ...
-                        fullfile(this.cDirThis, '..', 'bin', 'splitWRVtoFieldsByFile.pl'), ... 
+                        fullfile(this.cDirThis, '..', 'bin', 'splitWRVtoFieldsByFile.pl'), ...
                         sFilePath, dNBlocks, this.uieBlockSize.get(), sFilePath);
                     system(cExStr);
                     fprintf('Exec perl command: \n\t%s\n\n', cExStr);
                     fprintf('Field splitting complete...\n\n');
                     
-                     % Combine files
-                     
+                    % Combine files
+                    
                     fprintf('Combining WRVs...\n\n');
                     cExStr = sprintf('%s %s %s.wrv %d %d %s_multifield.wrv', ...
                         cPerlStr, ...
-                        fullfile(this.cDirThis, '..', 'bin', 'combineFiles.pl'), ... 
+                        fullfile(this.cDirThis, '..', 'bin', 'combineFiles.pl'), ...
                         sFilePath, dNBlocks, this.uieBlockSize.get(), sFilePath);
                     system(cExStr);
                     fprintf('Exec perl command: \n\t%s\n\n', cExStr);
@@ -833,25 +1444,25 @@ classdef uizpgen < mic.Base
             
             if this.uipFileOutput.getSelectedIndex() == uint8(1) && dNBlocks > 1
                 fprintf('Splitting NWA into fields...\n\n');
-                    cExStr = sprintf('%s %s %s.nwa %d %d %s_multifield.nwa', ...
-                        cPerlStr, ...
-                        fullfile(this.cDirThis, '..', 'bin', 'splitNWAtoFieldsByFile.pl'), ... 
-                        sFilePath, dNBlocks, this.uieBlockSize.get(), sFilePath);
-                    system(cExStr);
-                    fprintf('Exec perl command: \n\t%s\n\n', cExStr);
-                    fprintf('Field splitting complete...\n\n');
-                    
-                     % Combine files
-                    fprintf('Combining NWAs...\n\n');
-                    cExStr = sprintf('%s %s %s_multifield.nwa %d %d %s_multifield.nwa', ...
-                        cPerlStr, ...
-                        fullfile(this.cDirThis, '..', 'bin', 'combineFilesNWA.pl'), ... 
-                        sFilePath, dNBlocks, this.uieBlockSize.get(), sFilePath);
-                    system(cExStr);
-                    fprintf('Exec perl command: \n\t%s\n\n', cExStr);
-                    fprintf('Field splitting complete...\n\n');
-                    
-                    sFilePath = [sFilePath '_multifield'];
+                cExStr = sprintf('%s %s %s.nwa %d %d %s_multifield.nwa', ...
+                    cPerlStr, ...
+                    fullfile(this.cDirThis, '..', 'bin', 'splitNWAtoFieldsByFile.pl'), ...
+                    sFilePath, dNBlocks, this.uieBlockSize.get(), sFilePath);
+                system(cExStr);
+                fprintf('Exec perl command: \n\t%s\n\n', cExStr);
+                fprintf('Field splitting complete...\n\n');
+                
+                % Combine files
+                fprintf('Combining NWAs...\n\n');
+                cExStr = sprintf('%s %s %s_multifield.nwa %d %d %s_multifield.nwa', ...
+                    cPerlStr, ...
+                    fullfile(this.cDirThis, '..', 'bin', 'combineFilesNWA.pl'), ...
+                    sFilePath, dNBlocks, this.uieBlockSize.get(), sFilePath);
+                system(cExStr);
+                fprintf('Exec perl command: \n\t%s\n\n', cExStr);
+                fprintf('Field splitting complete...\n\n');
+                
+                sFilePath = [sFilePath '_multifield'];
                 
             end
             
@@ -883,23 +1494,23 @@ classdef uizpgen < mic.Base
             
             fprintf('Zone plate %s finished in %s \n', sFilePath, s2f(toc));
             
-           
+            
             
         end
         
         function stageZP(this)
             
             % Do some checks:
-%             if this.uieNumBlocks.get() > 1 && this.uieBlockSize.get() > 800000
-%                 warndlg('WRV Blocksize must be 800,000 or less to prevent overrun.  Aborting stage');
-%                 return
-%             end
+            %             if this.uieNumBlocks.get() > 1 && this.uieBlockSize.get() > 800000
+            %                 warndlg('WRV Blocksize must be 800,000 or less to prevent overrun.  Aborting stage');
+            %                 return
+            %             end
             
             if strcmp(this.arch, 'win64')
                 sPrefix = [cd '\src\bin\ZPGen.exe '];
                 sFilePath = regexprep(this.uieZPName.get(), '\s', '_');
             else
-                sPrefix =  fullfile(this.cZPGenDir, 'bin', 'ZPGen');
+                sPrefix =  fullfile(this.cZPGenDir, 'bin', 'ZPGenHolo');
                 
                 if isempty(this.cOutputFileDir)
                     sFilePath = fullfile(this.cZPGenDir, 'ZPFiles', regexprep(this.uieZPName.get(), '\s', '_'));
@@ -910,37 +1521,50 @@ classdef uizpgen < mic.Base
             end
             
             
-           
+            
             sParams = '';
             sTimestamp = datestr(now, 30);
             
-           
             
-   
+            
+            
             
             % ------- Generate sParams ------------%
             % Zone tolerance
             sParams = [sParams sprintf(' %0.4f ', this.uieZoneTol.get())];
+            
             % lambda (nm)
             sParams = [sParams sprintf(' %0.4f ', this.uieLambda.get())];
+            
             % p (um)
-            sParams = [sParams sprintf(' %0.4f ', this.uieP.get())];
+            sParams = [sParams sprintf(' %s ', this.makePString())];
+            
             % q (um)
             sParams = [sParams sprintf(' %0.4f ', this.uieQ.get())];
+            
+            % k
+            sParams = [sParams sprintf(' %s ', this.makeArStr(this.uieKhat.get()))];
+            
+            % bx
+            sParams = [sParams sprintf(' %s ', this.makeArStr(this.uieBeta1hat.get()))];
+            
+            % by
+            sParams = [sParams sprintf(' %s ', this.makeArStr(this.uieBeta2hat.get()))];
+            
+            
+            
             % obscuration sigma
             sParams = [sParams sprintf(' %0.4f ', this.uieObscurationSigma.get())];
+            
             % NA
             sParams = [sParams sprintf(' %0.4f ', this.uieNA.get())];
+            
             % zernike string
             sParams = [sParams this.makeZrnStr()];
+            
             % custom Mask
             sParams = [sParams sprintf(' %d ', this.uipCustomMask.getSelectedIndex() - 1)];
-            % Tilted zp plane (about x-axis) (deg)
-            sParams = [sParams sprintf(' %0.4f ', this.uieZPTilt.get() * pi/180)];
-            % CRA azimuthal (degrees)
-            sParams = [sParams sprintf(' %0.4f ', this.uieCraAz.get())];
-            % CRA angle (degree)
-            sParams = [sParams sprintf(' %0.4f ', this.uieCraAngle.get())];
+            
             % Anamorphic factor
             sParams = [sParams sprintf(' %0.4f ', this.uieAnamorphicFac.get())];
             % Phase of zernike region (deg)
@@ -965,14 +1589,14 @@ classdef uizpgen < mic.Base
             sParams = [sParams sprintf(' %0.4f ', this.uieButtressW.get())];
             % Buttress T (period in dr)
             sParams = [sParams sprintf(' %0.4f ', this.uieButtressT.get())];
-            % Center offaxis zone plate
-            if (this.uicbCenterOffaxisZP.get())
-                sParams = [sParams sprintf(' %d ', 1)];
-            elseif (this.uicbOffsetTiltedZP.get())
-                sParams = [sParams sprintf(' %d ', 2)];
-            else
-                sParams = [sParams sprintf(' %d ', 0)];
-            end
+            %             % Center offaxis zone plate
+            %             if (this.uicbCenterOffaxisZP.get())
+            %                 sParams = [sParams sprintf(' %d ', 1)];
+            %             elseif (this.uicbOffsetTiltedZP.get())
+            %                 sParams = [sParams sprintf(' %d ', 2)];
+            %             else
+            %                 sParams = [sParams sprintf(' %d ', 0)];
+            %             end
             % Blocksize [1e6]
             sParams = [sParams sprintf(' %d ', this.uieBlockSize.get())];
             % Multiple patterning, number of parts
@@ -992,7 +1616,7 @@ classdef uizpgen < mic.Base
             sParams = [sParams sprintf(' %d ', dVal)];
             
             
-            % NWA pixel size or WRV pixel size 
+            % NWA pixel size or WRV pixel size
             if this.uipFileOutput.getSelectedIndex() == uint8(4) || this.uipFileOutput.getSelectedIndex() == uint8(5)
                 sParams = [sParams sprintf(' %d ', this.uieWRVBlockUnit.get())];
             else
@@ -1003,9 +1627,9 @@ classdef uizpgen < mic.Base
             
             this.cExecStr = [sPrefix, sParams, sFilePath];
             if strcmp(this.arch, 'win64')
-                 this.cExecStr = [sPrefix, sParams, sFilePath, ' & move ' sFilePath '.* src\ZPFiles'];
+                this.cExecStr = [sPrefix, sParams, sFilePath, ' & move ' sFilePath '.* src\ZPFiles'];
             else
-                 this.cExecStr = [sPrefix, sParams, sFilePath];
+                this.cExecStr = [sPrefix, sParams, sFilePath];
             end
             
             
@@ -1013,7 +1637,7 @@ classdef uizpgen < mic.Base
             this.uieExecStr.set(this.cExecStr);
             
             logItem = [ this.uieZPName.get(), ',', this.cBuildName, ',', regexprep(sParams, '\s\s', ','), ',', this.cExecStr];
-            this.cLogStr = logItem; 
+            this.cLogStr = logItem;
             
             % Echo string arguments to console for use in vscode argument
             % array:
@@ -1031,15 +1655,15 @@ classdef uizpgen < mic.Base
             
             
             
-           
+            
             
         end
-      
+        
         
         
     end
     
-   
+    
     
     
 end
