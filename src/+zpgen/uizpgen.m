@@ -1627,7 +1627,7 @@ classdef uizpgen < mic.Base
             
             this.cExecStr = [sPrefix, sParams, sFilePath];
             if strcmp(this.arch, 'win64')
-                this.cExecStr = [sPrefix, sParams, sFilePath, ' & move ' sFilePath '.* src\ZPFiles'];
+                this.cExecStr = [sPrefix, sParams, sFilePath]; %, ' & move ' sFilePath '.* src\ZPFiles'];
             else
                 this.cExecStr = [sPrefix, sParams, sFilePath];
             end
