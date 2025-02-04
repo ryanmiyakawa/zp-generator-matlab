@@ -7,6 +7,8 @@
 %
 % Changelog:
 %
+% 3.1.0: Adding an explicit azimuth, populated by k
+%
 % 3.0.0: Migrating to new Hologen ZP framework
 %
 % 2.16.1: Adding new obscurations
@@ -64,7 +66,7 @@ classdef uizpgen < mic.Base
     
     
     properties (Constant)
-        cBuildName = 'ZPGen v3.0.0';
+        cBuildName = 'ZPGen v3.1.0';
         
         dWidth  = 1500;
         dHeight =  800;
@@ -198,6 +200,8 @@ classdef uizpgen < mic.Base
         uipCustomMask
         uipNWAPxSize
         
+        
+        
         hUIPanelFile
         hUIPanelOptical
         hUIPanelPattern
@@ -206,6 +210,7 @@ classdef uizpgen < mic.Base
         uieWRVBlockUnit
         
         uieAnamorphicFac
+        uieAnamorphicAzi
         uicbCenterOffaxisZP
         uicbOffsetTiltedZP
         
@@ -286,6 +291,7 @@ classdef uizpgen < mic.Base
             
             
             this.uieAnamorphicFac       = mic.ui.common.Edit('cLabel', 'Ana. fac.', 'cType', 'd', 'fhDirectCallback', @this.cb);
+            this.uieAnamorphicAzi       = mic.ui.common.Edit('cLabel', 'Azimuth.', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieZernikes            = mic.ui.common.Edit('cLabel', 'Zernike string', 'cType', 'c', 'fhDirectCallback', @this.cb);
             this.uieAlpha               = mic.ui.common.Edit('cLabel', 'Alpha', 'cType', 'd', 'fhDirectCallback', @this.cb);
             this.uieZPTilt              = mic.ui.common.Edit('cLabel', 'Tilt (deg)', 'cType', 'd', 'fhDirectCallback', @this.cb);
@@ -396,6 +402,7 @@ classdef uizpgen < mic.Base
             
             this.uieZoneTol.set(0.01);
             this.uieAnamorphicFac.set(1);
+            this.uieAnamorphicAzi.set(0);
             
             this.uieLambda.set(13.5);
             this.uieNA.set(0.08);
@@ -488,6 +495,8 @@ classdef uizpgen < mic.Base
                         this.uieZoneTol.set(varargin{k+1});
                     case 'anamorphicFac'
                         this.uieAnamorphicFac.set(varargin{k+1});
+                    case 'anamorphicAzi'
+                        this.uieAnamorphicAzi.set(varargin{k+1});
                     case 'paramW'
                         this.uieButtressW.set(varargin{k+1});
                     case 'outputIdx'
@@ -703,13 +712,18 @@ classdef uizpgen < mic.Base
                     
                     this.uieKAngle.setWithoutNotify(dTh);
                     this.uieKAzi.setWithoutNotify(dAzi);
+                    this.uieAnamorphicAzi.setWithoutNotify(dAzi);
                     
                     this.buildOpticalTemplate();
                     
                 case this.uieKAngle
                     this.updateKhat();
+
+
                 case this.uieKAzi
                     this.updateKhat();
+                    dAzi = this.uieKAzi.get();
+                     this.uieAnamorphicAzi.setWithoutNotify(dAzi);
                     
                 case this.uieBeta1hat
                     % Sanitize:
@@ -839,6 +853,12 @@ classdef uizpgen < mic.Base
                         this.uieBlockSize.set(800000);
                     end
                     
+                case this.uieAnamorphicFac
+                    this.buildPupilView();
+                case this.uieAnamorphicAzi
+                    this.buildPupilView();
+                case this.uieObscurationSigma
+                    this.buildPupilView();
                     
             end
         end
@@ -863,10 +883,37 @@ classdef uizpgen < mic.Base
             Rx = this.uieNA.get();
             Ry = this.uieNA.get()/this.uieAnamorphicFac.get();
             
+            azi = pi/180 * this.uieAnamorphicAzi.get() - pi/2;
+            
+            
+            dSigma = this.uieObscurationSigma.get();
+
+                                    
             X = Rx * cos(th);
             Y = Ry * sin(th);
             
+            R = [cos(azi), -sin(azi); sin(azi), cos(azi)];
+            
+
+                        
+            xy = R * [X;Y];
+            X = xy(1,:);
+            Y = xy(2,:);
+            
+            
+            if isempty(this.haPupil)
+                return
+            end
+            
             this.hPatches{end+1} = patch('Parent', this.haPupil, 'XData', X, 'YData', Y, 'FaceColor', 'g');
+            this.hPatches{end+1} = patch('Parent', this.haPupil, 'XData', X * dSigma, 'YData', Y * dSigma, 'FaceColor', 'k');
+
+            
+            mn = min([X, Y]);
+            mx = max([X, Y]);
+            this.haPupil.XLim = [mn mx];
+            this.haPupil.YLim = [mn, mx];
+            
             
         end
         
@@ -1111,8 +1158,9 @@ classdef uizpgen < mic.Base
             
             this.uieObscurationSigma.build(this.hUIPanelOptical, dCol1, row*dYWid, 60, 30);
             this.uieAnamorphicFac.build(this.hUIPanelOptical, dCol1 + 1*dW, row*dYWid, 60, 30);
+            this.uieAnamorphicAzi.build(this.hUIPanelOptical, dCol1 + 2*dW, row*dYWid, 60, 30);
             
-            this.uieZernikes.build(this.hUIPanelOptical, dCol1 + 2*dW, row*dYWid, 220, 30);
+            this.uieZernikes.build(this.hUIPanelOptical, dCol1 + 3*dW, row*dYWid, 160, 30);
             
             this.uipCustomMask.build(this.hUIPanelOptical, dCol5, row*dYWid, 200, 30);
             
@@ -1183,20 +1231,20 @@ classdef uizpgen < mic.Base
             row = row + 1; % ====
             this.uicbReverseTone.build(this.hUIPanelPattern, dCol1, row*dYWid + 10, 120, 30);
             
-            row = row + 1; % ====
-            this.uieBlockSize.build(this.hUIPanelPattern, dCol1, row*dYWid, 80, 30);
-            this.uieNumBlocks.build(this.hUIPanelPattern, dCol2, row*dYWid, 80, 30);
-            this.uieBlockGrid.build(this.hUIPanelPattern, dCol3, row*dYWid, 80, 30);
-            this.uieWRVBlockUnit.build(this.hUIPanelPattern, dCol4, row*dYWid, 80, 30);
-            this.uicbRandomizeWRVZones.build(this.hUIPanelPattern, dCol5, row*dYWid + 10, 150, 30);
+%             row = row + 1; % ====
+%             this.uieBlockSize.build(this.hUIPanelPattern, dCol1, row*dYWid, 80, 30);
+%             this.uieNumBlocks.build(this.hUIPanelPattern, dCol2, row*dYWid, 80, 30);
+%             this.uieBlockGrid.build(this.hUIPanelPattern, dCol3, row*dYWid, 80, 30);
+%             this.uieWRVBlockUnit.build(this.hUIPanelPattern, dCol4, row*dYWid, 80, 30);
+%             this.uicbRandomizeWRVZones.build(this.hUIPanelPattern, dCol5, row*dYWid + 10, 150, 30);
             
             row = row + 1; % ====
             this.uicbCenterOffaxisZP.build(this.hUIPanelPattern, dCol5, row*dYWid -5, 115, 30);
             
-            row = row + 1; % ====
+%             row = row + 1; % ====
             this.uieLayerNumber.build(this.hUIPanelPattern, dCol1, row*dYWid, 75, 30);
-            this.uipNWAPxSize.build(this.hUIPanelPattern, dCol2, row*dYWid + 10, 150, 30);
-            this.uicbOffsetTiltedZP.build(this.hUIPanelPattern, dCol5, row*dYWid -5, 115, 30);
+%             this.uipNWAPxSize.build(this.hUIPanelPattern, dCol2, row*dYWid + 10, 150, 30);
+%             this.uicbOffsetTiltedZP.build(this.hUIPanelPattern, dCol5, row*dYWid -5, 115, 30);
             
             
             
@@ -1204,11 +1252,11 @@ classdef uizpgen < mic.Base
             % Execute
             
             row = 1;
-            this.uibStageAndGenerate.build(this.hUIPanelExecute, dCol5 , dYWid + 10 , 120, 40);
-            this.uipFileOutput.build(this.hUIPanelExecute, dCol1, dYWid, 200, 30);
-            this.uicbCompressFiles.build(this.hUIPanelExecute, dCol3 + 20, dYWid + 10, 180, 30);
-            this.uicbComputeExternally.build(this.hUIPanelExecute, dCol3 + 20, dYWid + 33, 180, 30);
-            
+            this.uibStageAndGenerate.build(this.hUIPanelExecute, dCol1 , dYWid + 10 , 120, 40);
+%             this.uipFileOutput.build(this.hUIPanelExecute, dCol1, dYWid, 200, 30);
+%             this.uicbCompressFiles.build(this.hUIPanelExecute, dCol3 + 20, dYWid + 10, 180, 30);
+%             this.uicbComputeExternally.build(this.hUIPanelExecute, dCol3 + 20, dYWid + 33, 180, 30);
+%             
             
             row = row + 1; %====
             this.uibStageZP.build(this.hUIPanelExecute, dCol1 , row*dYWid + 10 , 100, 30);
@@ -1567,6 +1615,8 @@ classdef uizpgen < mic.Base
             
             % Anamorphic factor
             sParams = [sParams sprintf(' %0.4f ', this.uieAnamorphicFac.get())];
+            % Anamorphic Azimuth (deg)
+            sParams = [sParams sprintf(' %0.4f ', -this.uieAnamorphicAzi.get()* pi/180)];
             % Phase of zernike region (deg)
             sParams = [sParams sprintf(' %0.4f ', this.uieZPPhase.get() * pi/180 )];
             % Apodization of central reg [1]
