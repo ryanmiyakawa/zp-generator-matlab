@@ -6,6 +6,7 @@
 % accommodate different setups
 %
 % Changelog:
+% 3.2.0: exposing zone randomization
 %
 % 3.1.0: Adding an explicit azimuth, populated by k
 %
@@ -66,7 +67,7 @@ classdef uizpgen < mic.Base
     
     
     properties (Constant)
-        cBuildName = 'ZPGen v3.1.0';
+        cBuildName = 'ZPGen v3.2.0';
         
         dWidth  = 1500;
         dHeight =  800;
@@ -93,6 +94,7 @@ classdef uizpgen < mic.Base
             'Zone bias (nm)', ...
             'File format',...
             'Tone reversal',...
+            'Zone start randomized', ...
             'Buttressing',...
             'Buttress width',...
             'Buttress period',...
@@ -364,7 +366,7 @@ classdef uizpgen < mic.Base
             this.uicbCompressFiles  = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Compress ZP with Log', 'fhDirectCallback', @this.cb);
             
             
-            this.uicbRandomizeWRVZones  = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Randomize WRV Zones', 'fhDirectCallback', @this.cb);
+            this.uicbRandomizeWRVZones  = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Randomize Zones', 'fhDirectCallback', @this.cb);
             
             
             this.uicbCenterOffaxisZP    = mic.ui.common.Checkbox('lChecked', false, 'cLabel', 'Center Off-axis ZP', 'fhDirectCallback', @this.cb);
@@ -449,8 +451,8 @@ classdef uizpgen < mic.Base
             this.uicbCenterOffaxisZP.set(true);
             this.uicbOffsetTiltedZP.set(false);
             this.uicbInfiniteConjugate.set(false);
-            
-            
+            this.uicbRandomizeWRVZones.set(true);
+
             
             
             
@@ -1236,7 +1238,7 @@ classdef uizpgen < mic.Base
 %             this.uieNumBlocks.build(this.hUIPanelPattern, dCol2, row*dYWid, 80, 30);
 %             this.uieBlockGrid.build(this.hUIPanelPattern, dCol3, row*dYWid, 80, 30);
 %             this.uieWRVBlockUnit.build(this.hUIPanelPattern, dCol4, row*dYWid, 80, 30);
-%             this.uicbRandomizeWRVZones.build(this.hUIPanelPattern, dCol5, row*dYWid + 10, 150, 30);
+            this.uicbRandomizeWRVZones.build(this.hUIPanelPattern, dCol2, row*dYWid + 10, 150, 30);
             
             row = row + 1; % ====
             this.uicbCenterOffaxisZP.build(this.hUIPanelPattern, dCol5, row*dYWid -5, 115, 30);
@@ -1633,6 +1635,8 @@ classdef uizpgen < mic.Base
             sParams = [sParams sprintf(' %d ', this.uipFileOutput.getSelectedIndex() - 1)];
             % Reverse tone ([0]: no, 1:yes)
             sParams = [sParams sprintf(' %d ', this.uicbReverseTone.get())];
+            % Randomize zones ([0]: no, 1:yes)
+            sParams = [sParams sprintf(' %d ', this.uicbRandomizeWRVZones.get())];
             % Buttress idx (0: none, 1: gapped zones, 2: gaps)
             sParams = [sParams sprintf(' %d ', this.uipButtressIdx.getSelectedIndex() - 1)];
             % Buttress W (width in dr)
